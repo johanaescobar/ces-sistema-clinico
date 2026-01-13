@@ -1,17 +1,28 @@
 // src/components/Layout.jsx
-import React, { useState } from 'react';
-import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { Menu, X, Home, UserPlus, Calendar, FileText, LayoutDashboard, LogOut, Settings } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Link, Outlet } from 'react-router-dom';
+import { Menu, X, Home, UserPlus, Calendar, FileText, LayoutDashboard, LogOut, Settings, CheckCircle } from 'lucide-react';
 
 const Layout = ({ usuario }) => {
   const [menuAbierto, setMenuAbierto] = useState(false);
-  const navigate = useNavigate();
+  const [cerrandoSesion, setCerrandoSesion] = useState(false);
+  const [contador, setContador] = useState(5);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('usuario');
-    navigate('/');
+    setCerrandoSesion(true);
   };
+
+  useEffect(() => {
+    if (cerrandoSesion && contador > 0) {
+      const timer = setTimeout(() => setContador(contador - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+    if (cerrandoSesion && contador === 0) {
+      window.location.href = 'https://www.google.com';
+    }
+  }, [cerrandoSesion, contador]);
 
   const esDocente = usuario?.rol === 'docente';
 
@@ -27,6 +38,32 @@ const Layout = ({ usuario }) => {
   const menuFiltrado = menuItems.filter(item => 
     item.roles.includes(usuario?.rol)
   );
+
+  // Pantalla de sesión cerrada
+  if (cerrandoSesion) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-10 h-10 text-green-600" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Sesión cerrada</h1>
+          <p className="text-gray-600 mb-4">¡Hasta pronto, {usuario?.nombre_completo?.split(' ')[0] || 'Usuario'}!</p>
+          <p className="text-sm text-gray-500">
+            Redirigiendo en <span className="font-bold text-blue-600">{contador}</span> segundos...
+          </p>
+          <div className="mt-6">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-1000"
+                style={{ width: `${(5 - contador) * 20}%` }}
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
