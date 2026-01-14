@@ -1,6 +1,6 @@
 // src/App.js
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import NuevoPaciente from './components/NuevoPaciente';
@@ -20,25 +20,29 @@ const Inicio = ({ usuario }) => (
       
       {usuario?.rol === 'estudiante' ? (
         <div className="grid gap-4 md:grid-cols-3">
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <Link to="/nuevo-paciente" className="bg-blue-50 p-4 rounded-lg border border-blue-200 hover:bg-blue-100 hover:shadow-md transition cursor-pointer">
             <h3 className="font-bold text-blue-800 mb-2">📋 Nuevo Paciente</h3>
             <p className="text-sm text-blue-600">Registra pacientes con su plan de tratamiento</p>
-          </div>
-          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+          </Link>
+          <Link to="/programar-cita" className="bg-green-50 p-4 rounded-lg border border-green-200 hover:bg-green-100 hover:shadow-md transition cursor-pointer">
             <h3 className="font-bold text-green-800 mb-2">📅 Programar Cita</h3>
             <p className="text-sm text-green-600">Agenda citas para tus pacientes</p>
-          </div>
-          <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+          </Link>
+          <Link to="/reportar" className="bg-purple-50 p-4 rounded-lg border border-purple-200 hover:bg-purple-100 hover:shadow-md transition cursor-pointer">
             <h3 className="font-bold text-purple-800 mb-2">📝 Reportar</h3>
             <p className="text-sm text-purple-600">Reporta los tratamientos realizados</p>
-          </div>
+          </Link>
         </div>
       ) : (
-        <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
-          <h3 className="font-bold text-amber-800 mb-2">🏥 Panel de Docente</h3>
-          <p className="text-sm text-amber-600">
-            Ve al Dashboard para revisar y aprobar los tratamientos reportados por tus estudiantes.
-          </p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <Link to="/dashboard" className="bg-amber-50 p-4 rounded-lg border border-amber-200 hover:bg-amber-100 hover:shadow-md transition cursor-pointer">
+            <h3 className="font-bold text-amber-800 mb-2">📊 Dashboard</h3>
+            <p className="text-sm text-amber-600">Revisa y aprueba los tratamientos reportados</p>
+          </Link>
+          <Link to="/admin" className="bg-indigo-50 p-4 rounded-lg border border-indigo-200 hover:bg-indigo-100 hover:shadow-md transition cursor-pointer">
+            <h3 className="font-bold text-indigo-800 mb-2">⚙️ Administración</h3>
+            <p className="text-sm text-indigo-600">Gestiona estudiantes, horarios y configuración</p>
+          </Link>
         </div>
       )}
 
