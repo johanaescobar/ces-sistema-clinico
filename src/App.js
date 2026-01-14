@@ -10,8 +10,9 @@ import Dashboard from './components/Dashboard';
 import AdminPanel from './components/AdminPanel';
 import MisPacientes from './components/MisPacientes';
 
-// Tiempo de inactividad en minutos
-const TIMEOUT_INACTIVIDAD_MINUTOS = 5;
+// Tiempo de inactividad en minutos (diferenciado por rol)
+const TIMEOUT_ESTUDIANTES_MINUTOS = 5;
+const TIMEOUT_DOCENTES_MINUTOS = 360; // 6 horas
 
 // Componente de inicio
 const Inicio = ({ usuario }) => (
@@ -70,7 +71,7 @@ const SesionExpirada = ({ onVolver }) => (
       </div>
       <h2 className="text-xl font-bold text-gray-900 mb-2">Sesión expirada</h2>
       <p className="text-gray-600 mb-6">
-        Tu sesión se cerró por inactividad ({TIMEOUT_INACTIVIDAD_MINUTOS} minutos).
+        Tu sesión se cerró por inactividad.
       </p>
       <button
         onClick={onVolver}
@@ -112,10 +113,15 @@ function App() {
     const ultimaActividad = sessionStorage.getItem('ultimaActividad');
     
     if (token && usuarioGuardado) {
+      const usuarioData = JSON.parse(usuarioGuardado);
+      const timeoutMinutos = usuarioData.rol === 'docente' 
+        ? TIMEOUT_DOCENTES_MINUTOS 
+        : TIMEOUT_ESTUDIANTES_MINUTOS;
+      
       // Verificar si la sesión expiró por inactividad
       if (ultimaActividad) {
         const tiempoInactivo = Date.now() - parseInt(ultimaActividad);
-        const tiempoLimite = TIMEOUT_INACTIVIDAD_MINUTOS * 60 * 1000;
+        const tiempoLimite = timeoutMinutos * 60 * 1000;
         
         if (tiempoInactivo > tiempoLimite) {
           cerrarSesion(true);
@@ -124,7 +130,7 @@ function App() {
         }
       }
       
-      setUsuario(JSON.parse(usuarioGuardado));
+      setUsuario(usuarioData);
       sessionStorage.setItem('ultimaActividad', Date.now().toString());
     }
     
@@ -135,11 +141,15 @@ function App() {
   useEffect(() => {
     if (!usuario) return;
 
+    const timeoutMinutos = usuario.rol === 'docente' 
+      ? TIMEOUT_DOCENTES_MINUTOS 
+      : TIMEOUT_ESTUDIANTES_MINUTOS;
+
     const verificarInactividad = () => {
       const ultimaActividad = sessionStorage.getItem('ultimaActividad');
       if (ultimaActividad) {
         const tiempoInactivo = Date.now() - parseInt(ultimaActividad);
-        const tiempoLimite = TIMEOUT_INACTIVIDAD_MINUTOS * 60 * 1000;
+        const tiempoLimite = timeoutMinutos * 60 * 1000;
         
         if (tiempoInactivo > tiempoLimite) {
           cerrarSesion(true);
