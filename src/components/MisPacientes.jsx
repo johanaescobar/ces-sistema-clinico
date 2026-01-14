@@ -14,7 +14,7 @@ const MisPacientes = () => {
   const [enviandoCambio, setEnviandoCambio] = useState(false);
   const [mensajeExito, setMensajeExito] = useState(null);
 
-  const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+  const usuario = JSON.parse(sessionStorage.getItem('usuario') || '{}');
 
   useEffect(() => {
     cargarPacientes();

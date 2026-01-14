@@ -9,8 +9,9 @@ const Layout = ({ usuario }) => {
   const [contador, setContador] = useState(5);
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('usuario');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('usuario');
+    sessionStorage.removeItem('ultimaActividad');
     setCerrandoSesion(true);
   };
 

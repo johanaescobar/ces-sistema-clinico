@@ -1,5 +1,5 @@
 // src/App.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
 import Login from './components/Login';
 import Layout from './components/Layout';
@@ -9,6 +9,9 @@ import ReportarTratamiento from './components/ReportarTratamiento';
 import Dashboard from './components/Dashboard';
 import AdminPanel from './components/AdminPanel';
 import MisPacientes from './components/MisPacientes';
+
+// Tiempo de inactividad en minutos
+const TIMEOUT_INACTIVIDAD_MINUTOS = 5;
 
 // Componente de inicio
 const Inicio = ({ usuario }) => (
@@ -58,21 +61,118 @@ const Inicio = ({ usuario }) => (
   </div>
 );
 
+// Componente de sesión expirada
+const SesionExpirada = ({ onVolver }) => (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center p-4">
+    <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+      <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <span className="text-3xl">⏰</span>
+      </div>
+      <h2 className="text-xl font-bold text-gray-900 mb-2">Sesión expirada</h2>
+      <p className="text-gray-600 mb-6">
+        Tu sesión se cerró por inactividad ({TIMEOUT_INACTIVIDAD_MINUTOS} minutos).
+      </p>
+      <button
+        onClick={onVolver}
+        className="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition"
+      >
+        Volver a iniciar sesión
+      </button>
+    </div>
+  </div>
+);
+
 function App() {
   const [usuario, setUsuario] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [sesionExpirada, setSesionExpirada] = useState(false);
 
+  // Función para cerrar sesión
+  const cerrarSesion = useCallback((porInactividad = false) => {
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('usuario');
+    sessionStorage.removeItem('ultimaActividad');
+    setUsuario(null);
+    if (porInactividad) {
+      setSesionExpirada(true);
+    }
+  }, []);
+
+  // Función para actualizar última actividad
+  const actualizarActividad = useCallback(() => {
+    if (usuario) {
+      sessionStorage.setItem('ultimaActividad', Date.now().toString());
+    }
+  }, [usuario]);
+
+  // Verificar sesión al cargar
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const usuarioGuardado = localStorage.getItem('usuario');
+    const token = sessionStorage.getItem('token');
+    const usuarioGuardado = sessionStorage.getItem('usuario');
+    const ultimaActividad = sessionStorage.getItem('ultimaActividad');
     
     if (token && usuarioGuardado) {
+      // Verificar si la sesión expiró por inactividad
+      if (ultimaActividad) {
+        const tiempoInactivo = Date.now() - parseInt(ultimaActividad);
+        const tiempoLimite = TIMEOUT_INACTIVIDAD_MINUTOS * 60 * 1000;
+        
+        if (tiempoInactivo > tiempoLimite) {
+          cerrarSesion(true);
+          setLoading(false);
+          return;
+        }
+      }
+      
       setUsuario(JSON.parse(usuarioGuardado));
+      sessionStorage.setItem('ultimaActividad', Date.now().toString());
     }
     
     setLoading(false);
-  }, []);
+  }, [cerrarSesion]);
 
+  // Verificar inactividad cada 30 segundos
+  useEffect(() => {
+    if (!usuario) return;
+
+    const verificarInactividad = () => {
+      const ultimaActividad = sessionStorage.getItem('ultimaActividad');
+      if (ultimaActividad) {
+        const tiempoInactivo = Date.now() - parseInt(ultimaActividad);
+        const tiempoLimite = TIMEOUT_INACTIVIDAD_MINUTOS * 60 * 1000;
+        
+        if (tiempoInactivo > tiempoLimite) {
+          cerrarSesion(true);
+        }
+      }
+    };
+
+    const intervalo = setInterval(verificarInactividad, 30000); // cada 30 segundos
+    return () => clearInterval(intervalo);
+  }, [usuario, cerrarSesion]);
+
+  // Detectar actividad del usuario
+  useEffect(() => {
+    if (!usuario) return;
+
+    const eventos = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+    
+    const handleActividad = () => {
+      actualizarActividad();
+    };
+
+    eventos.forEach(evento => {
+      window.addEventListener(evento, handleActividad, { passive: true });
+    });
+
+    return () => {
+      eventos.forEach(evento => {
+        window.removeEventListener(evento, handleActividad);
+      });
+    };
+  }, [usuario, actualizarActividad]);
+
+  // Pantalla de carga
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -81,8 +181,17 @@ function App() {
     );
   }
 
+  // Sesión expirada por inactividad
+  if (sesionExpirada) {
+    return <SesionExpirada onVolver={() => setSesionExpirada(false)} />;
+  }
+
+  // No hay usuario, mostrar login
   if (!usuario) {
-    return <Login onLoginSuccess={setUsuario} />;
+    return <Login onLoginSuccess={(u) => {
+      setUsuario(u);
+      setSesionExpirada(false);
+    }} />;
   }
 
   return (

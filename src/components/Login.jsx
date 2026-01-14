@@ -90,8 +90,9 @@ const Login = ({ onLoginSuccess }) => {
         nombre_completo: correo.includes('jescobarp') ? 'Johana Escobar' : 'Usuario Prueba',
         rol: correo.includes('jescobarp') ? 'docente' : 'estudiante'
       };
-      localStorage.setItem('token', 'dev-token-' + Date.now());
-      localStorage.setItem('usuario', JSON.stringify(usuarioDev));
+      sessionStorage.setItem('token', 'dev-token-' + Date.now());
+      sessionStorage.setItem('usuario', JSON.stringify(usuarioDev));
+      sessionStorage.setItem('ultimaActividad', Date.now().toString());
       onLoginSuccess(usuarioDev);
       return;
     }
@@ -117,8 +118,9 @@ const Login = ({ onLoginSuccess }) => {
       const data = await response.json();
 
       if (data.ok) {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('usuario', JSON.stringify(data.usuario || { correo }));
+        sessionStorage.setItem('token', data.token);
+        sessionStorage.setItem('usuario', JSON.stringify(data.usuario || { correo }));
+        sessionStorage.setItem('ultimaActividad', Date.now().toString());
         onLoginSuccess(data.usuario || { correo });
       } else {
         setError(data.error || 'Código inválido');
