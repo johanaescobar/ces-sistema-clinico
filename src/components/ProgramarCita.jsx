@@ -85,7 +85,7 @@ const ProgramarCita = () => {
       } else {
         const ahora = new Date();
         const opcionesColombia = { timeZone: 'America/Bogota' };
-        const diaSemana = ahora.toLocaleDateString('es-CO', { ...opcionesColombia, weekday: 'long' }).toLowerCase();
+        const diaSemana = ahora.toLocaleDateString('es-CO', { ...opcionesColombia, weekday: 'long' }).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
         const horaActual = ahora.toLocaleTimeString('es-CO', { ...opcionesColombia, hour: '2-digit', minute: '2-digit', hour12: false });
 
         // Buscar si hay horario activo para hoy
