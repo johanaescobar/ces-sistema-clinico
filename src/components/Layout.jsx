@@ -1,7 +1,6 @@
 // src/components/Layout.jsx
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet } from 'react-router-dom';
-import { Menu, X, Home, UserPlus, Calendar, FileText, LayoutDashboard, LogOut, Settings, CheckCircle } from 'lucide-react';
 import { Menu, X, Home, UserPlus, Calendar, FileText, LayoutDashboard, LogOut, Settings, CheckCircle, Users } from 'lucide-react';
 
 const Layout = ({ usuario }) => {
