@@ -136,7 +136,7 @@ const ProgramarCita = () => {
         }
       );
       const festivosData = await resFestivos.json();
-      setFestivos(festivosData.map(f => f.fecha));
+      setFestivos(Array.isArray(festivosData) ? festivosData.map(f => f.fecha) : []);
 
       // 4. Cargar pacientes del estudiante (o todos si es docente)
       let urlPacientes = `${SUPABASE_CONFIG.URL}/rest/v1/pacientes?select=*,planes_tratamiento(*)`;
