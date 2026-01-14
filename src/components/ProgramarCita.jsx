@@ -84,8 +84,9 @@ const ProgramarCita = () => {
         setAccesoPermitido(true);
       } else {
         const ahora = new Date();
-        const diaSemana = ahora.toLocaleDateString('es-CO', { weekday: 'long' }).toLowerCase();
-        const horaActual = ahora.toTimeString().slice(0, 5);
+        const opcionesColombia = { timeZone: 'America/Bogota' };
+        const diaSemana = ahora.toLocaleDateString('es-CO', { ...opcionesColombia, weekday: 'long' }).toLowerCase();
+        const horaActual = ahora.toLocaleTimeString('es-CO', { ...opcionesColombia, hour: '2-digit', minute: '2-digit', hour12: false });
 
         // Buscar si hay horario activo para hoy
         const horarioHoy = horarios.find(h => h.dia_semana === diaSemana);
