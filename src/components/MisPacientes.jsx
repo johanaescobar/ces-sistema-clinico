@@ -1,6 +1,6 @@
 // src/components/MisPacientes.jsx
 import React, { useState, useEffect } from 'react';
-import { Users, Eye, Edit, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { Users, Eye, Edit, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle, X, Calendar, Clock } from 'lucide-react';
 import { SUPABASE_CONFIG } from '../config/api';
 
 const MisPacientes = () => {
@@ -8,6 +8,7 @@ const MisPacientes = () => {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
   const [pacienteExpandido, setPacienteExpandido] = useState(null);
+  const [planExpandido, setPlanExpandido] = useState(null);
   const [modalEditar, setModalEditar] = useState(null);
   const [descripcionCambio, setDescripcionCambio] = useState('');
   const [enviandoCambio, setEnviandoCambio] = useState(false);
@@ -23,7 +24,6 @@ const MisPacientes = () => {
     try {
       setCargando(true);
       
-      // Buscar pacientes donde el estudiante es el actual
       const response = await fetch(
         `${SUPABASE_CONFIG.URL}/rest/v1/pacientes?estudiante_actual_id=eq.${usuario.id}&select=*,planes_tratamiento(*)`,
         {
@@ -45,12 +45,17 @@ const MisPacientes = () => {
     }
   };
 
-  const toggleExpansion = (pacienteId) => {
+  const togglePaciente = (pacienteId) => {
     setPacienteExpandido(pacienteExpandido === pacienteId ? null : pacienteId);
+    setPlanExpandido(null);
   };
 
-  const abrirModalEditar = (paciente) => {
-    setModalEditar(paciente);
+  const togglePlan = (planId) => {
+    setPlanExpandido(planExpandido === planId ? null : planId);
+  };
+
+  const abrirModalEditar = (paciente, plan) => {
+    setModalEditar({ paciente, plan });
     setDescripcionCambio('');
     setMensajeExito(null);
   };
@@ -65,8 +70,6 @@ const MisPacientes = () => {
     
     setEnviandoCambio(true);
     try {
-      const planActivo = modalEditar.planes_tratamiento?.find(p => p.estado === 'aprobado');
-      
       const response = await fetch(
         `${SUPABASE_CONFIG.URL}/rest/v1/modificaciones_plan`,
         {
@@ -78,8 +81,8 @@ const MisPacientes = () => {
             'Prefer': 'return=representation'
           },
           body: JSON.stringify({
-            plan_id: planActivo?.id,
-            paciente_id: modalEditar.id,
+            plan_id: modalEditar.plan.id,
+            paciente_id: modalEditar.paciente.id,
             estudiante_id: usuario.id,
             tipo_modificacion: 'modificar',
             descripcion_cambio: descripcionCambio,
@@ -93,8 +96,6 @@ const MisPacientes = () => {
       setMensajeExito('Cambio enviado. La Dra. Johana recibirá una notificación para aprobarlo.');
       setDescripcionCambio('');
       
-      // TODO: Enviar notificación WhatsApp a Johana
-      
     } catch (err) {
       setError(err.message);
     } finally {
@@ -102,12 +103,19 @@ const MisPacientes = () => {
     }
   };
 
+  const formatearFecha = (fecha) => {
+    if (!fecha) return 'N/A';
+    return new Date(fecha).toLocaleDateString('es-CO', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
   const formatearPlan = (planCompleto) => {
     if (!planCompleto) return null;
-    
     try {
-      const plan = typeof planCompleto === 'string' ? JSON.parse(planCompleto) : planCompleto;
-      return plan;
+      return typeof planCompleto === 'string' ? JSON.parse(planCompleto) : planCompleto;
     } catch {
       return null;
     }
@@ -118,7 +126,6 @@ const MisPacientes = () => {
 
     return (
       <div className="space-y-4 text-sm">
-        {/* Fase Higiénica Periodontal */}
         {plan.fase_higienica_periodontal && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Higiénica Periodontal</h5>
@@ -135,7 +142,6 @@ const MisPacientes = () => {
           </div>
         )}
 
-        {/* Fase Higiénica Dental */}
         {plan.fase_higienica_dental && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Higiénica Dental</h5>
@@ -153,7 +159,6 @@ const MisPacientes = () => {
           </div>
         )}
 
-        {/* Fase Reevaluativa */}
         {plan.fase_reevaluativa && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Reevaluativa</h5>
@@ -161,7 +166,6 @@ const MisPacientes = () => {
           </div>
         )}
 
-        {/* Fase Correctiva Inicial */}
         {plan.fase_correctiva_inicial && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Correctiva Inicial</h5>
@@ -182,7 +186,6 @@ const MisPacientes = () => {
           </div>
         )}
 
-        {/* Fase Correctiva Final */}
         {plan.fase_correctiva_final && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Correctiva Final</h5>
@@ -201,7 +204,6 @@ const MisPacientes = () => {
           </div>
         )}
 
-        {/* Fase Mantenimiento */}
         {plan.fase_mantenimiento && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase de Mantenimiento</h5>
@@ -232,18 +234,16 @@ const MisPacientes = () => {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-        {/* Header */}
         <div className="bg-teal-600 text-white px-6 py-4">
           <h2 className="text-xl font-bold flex items-center gap-2">
             <Users size={24} />
             Mis Pacientes
           </h2>
           <p className="text-teal-100 text-sm mt-1">
-            Pacientes asignados a ti. Puedes ver y proponer cambios a sus planes.
+            Pacientes asignados. Puedes ver el historial de planes y proponer cambios.
           </p>
         </div>
 
-        {/* Lista de pacientes */}
         <div className="p-6">
           {pacientes.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
@@ -254,16 +254,17 @@ const MisPacientes = () => {
           ) : (
             <div className="space-y-4">
               {pacientes.map(paciente => {
-                const planActivo = paciente.planes_tratamiento?.find(p => p.estado === 'aprobado');
-                const planFormateado = formatearPlan(planActivo?.plan_completo);
+                const planes = paciente.planes_tratamiento || [];
+                const planesOrdenados = [...planes].sort((a, b) => 
+                  new Date(b.created_at) - new Date(a.created_at)
+                );
                 const estaExpandido = pacienteExpandido === paciente.id;
 
                 return (
                   <div key={paciente.id} className="border rounded-lg overflow-hidden">
-                    {/* Cabecera del paciente */}
                     <div 
                       className="bg-gray-50 px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition"
-                      onClick={() => toggleExpansion(paciente.id)}
+                      onClick={() => togglePaciente(paciente.id)}
                     >
                       <div>
                         <h3 className="font-semibold text-gray-900">
@@ -272,24 +273,86 @@ const MisPacientes = () => {
                         <p className="text-sm text-gray-600">
                           CC: {paciente.cedula} | Tel: {paciente.celular}
                         </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {planesOrdenados.length} plan(es) de tratamiento
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); abrirModalEditar(paciente); }}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                          title="Proponer cambio al plan"
-                        >
-                          <Edit size={18} />
-                        </button>
                         {estaExpandido ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
                       </div>
                     </div>
 
-                    {/* Plan de tratamiento expandido */}
                     {estaExpandido && (
                       <div className="px-4 py-4 bg-white border-t">
-                        <h4 className="font-semibold text-gray-800 mb-3">Plan de Tratamiento Activo</h4>
-                        {renderPlan(planFormateado)}
+                        <h4 className="font-semibold text-gray-800 mb-3">Historial de Planes de Tratamiento</h4>
+                        
+                        {planesOrdenados.length === 0 ? (
+                          <p className="text-gray-500">Sin planes registrados</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {planesOrdenados.map((plan, index) => {
+                              const planFormateado = formatearPlan(plan.plan_completo);
+                              const esPlanExpandido = planExpandido === plan.id;
+                              const esActivo = !plan.fecha_finalizacion;
+
+                              return (
+                                <div key={plan.id} className={`border rounded-lg ${esActivo ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
+                                  <div 
+                                    className="px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition"
+                                    onClick={() => togglePlan(plan.id)}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div className={`w-2 h-2 rounded-full ${esActivo ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <span className="font-medium text-sm">
+                                            Plan #{planesOrdenados.length - index}
+                                          </span>
+                                          {esActivo && (
+                                            <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">Activo</span>
+                                          )}
+                                          {plan.fecha_finalizacion && (
+                                            <span className="text-xs bg-gray-500 text-white px-2 py-0.5 rounded">Finalizado</span>
+                                          )}
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                                          <span className="flex items-center gap-1">
+                                            <Calendar size={12} />
+                                            Inicio: {formatearFecha(plan.created_at)}
+                                          </span>
+                                          {plan.fecha_finalizacion && (
+                                            <span className="flex items-center gap-1">
+                                              <Clock size={12} />
+                                              Fin: {formatearFecha(plan.fecha_finalizacion)}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      {esActivo && (
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); abrirModalEditar(paciente, plan); }}
+                                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition"
+                                          title="Proponer cambio"
+                                        >
+                                          <Edit size={16} />
+                                        </button>
+                                      )}
+                                      {esPlanExpandido ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                    </div>
+                                  </div>
+
+                                  {esPlanExpandido && (
+                                    <div className="px-4 py-3 border-t bg-white">
+                                      {renderPlan(planFormateado)}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -300,13 +363,12 @@ const MisPacientes = () => {
         </div>
       </div>
 
-      {/* Modal para proponer cambio */}
       {modalEditar && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b flex items-center justify-between">
               <h3 className="text-lg font-semibold">
-                Proponer cambio para {modalEditar.primer_nombre} {modalEditar.primer_apellido}
+                Proponer cambio - {modalEditar.paciente.primer_nombre} {modalEditar.paciente.primer_apellido}
               </h3>
               <button onClick={cerrarModal} className="text-gray-500 hover:text-gray-700">
                 <X size={20} />
