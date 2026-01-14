@@ -1,6 +1,6 @@
 // src/components/ProgramarCita.jsx
 import React, { useState, useEffect } from 'react';
-import { Calendar, ChevronRight, ChevronLeft, Loader2, CheckCircle, AlertCircle, Clock, User, FileText } from 'lucide-react';
+import { Calendar, ChevronLeft, Loader2, CheckCircle, AlertCircle, Clock, User, FileText } from 'lucide-react';
 import { SUPABASE_CONFIG } from '../config/api';
 
 const ProgramarCita = () => {
@@ -29,8 +29,7 @@ const ProgramarCita = () => {
   const [citaCreada, setCitaCreada] = useState(null);
   const [enviando, setEnviando] = useState(false);
 
-  const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
-  console.log('DEBUG usuario:', usuario);
+  const usuario = JSON.parse(sessionStorage.getItem('usuario') || '{}');
   const esDocente = usuario.rol === 'docente';
 
   // Lista genérica de tratamientos
@@ -77,7 +76,8 @@ const ProgramarCita = () => {
           }
         }
       );
-      const horarios = await resHorarios.json();
+      const horariosData = await resHorarios.json();
+      const horarios = Array.isArray(horariosData) ? horariosData : [];
       setHorariosConfig(horarios);
 
       // 2. Verificar acceso (docentes siempre, estudiantes según horario)
@@ -105,9 +105,10 @@ const ProgramarCita = () => {
               }
             }
           );
-          const permisos = await resPermiso.json();
+          const permisosData = await resPermiso.json();
+          const permisos = Array.isArray(permisosData) ? permisosData : [];
           
-          if (permisos && permisos.length > 0) {
+          if (permisos.length > 0) {
             const permisoActivo = permisos.find(p => 
               new Date(p.fecha_inicio) <= ahora && new Date(p.fecha_fin) >= ahora
             );
@@ -151,7 +152,7 @@ const ProgramarCita = () => {
         }
       });
       const pacientesData = await resPacientes.json();
-      setPacientes(pacientesData);
+      setPacientes(Array.isArray(pacientesData) ? pacientesData : []);
 
       setPaso(1);
     } catch (err) {
@@ -162,6 +163,9 @@ const ProgramarCita = () => {
   };
 
   const getMotivoBloqueio = (horarios) => {
+    if (!Array.isArray(horarios) || horarios.length === 0) {
+      return 'No hay horarios configurados';
+    }
     const horariosTexto = horarios.map(h => {
       const dia = h.dia_semana.charAt(0).toUpperCase() + h.dia_semana.slice(1);
       return `${dia}: ${h.hora_inicio.slice(0, 5)} - ${h.hora_fin.slice(0, 5)}`;
@@ -173,7 +177,8 @@ const ProgramarCita = () => {
     setPacienteSeleccionado(paciente);
     
     // Extraer tratamientos pendientes del plan activo
-    const planActivo = paciente.planes_tratamiento?.find(p => !p.fecha_finalizacion);
+    const planes = Array.isArray(paciente.planes_tratamiento) ? paciente.planes_tratamiento : [];
+    const planActivo = planes.find(p => !p.fecha_finalizacion);
     if (planActivo?.plan_completo) {
       const plan = typeof planActivo.plan_completo === 'string' 
         ? JSON.parse(planActivo.plan_completo) 
@@ -375,7 +380,7 @@ const ProgramarCita = () => {
       }
 
       const cita = await response.json();
-      setCitaCreada(cita[0] || cita);
+      setCitaCreada(Array.isArray(cita) ? cita[0] : cita);
       setPaso(7);
     } catch (err) {
       setError('Error al crear la cita: ' + err.message);
