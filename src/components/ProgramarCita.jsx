@@ -28,7 +28,7 @@ const ProgramarCita = () => {
         body: JSON.stringify({
           correo: usuario.correo,
           token: token,
-          mensaje: mensajeUsuario
+          texto: mensajeUsuario
         })
       });
 
