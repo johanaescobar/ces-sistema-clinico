@@ -30,6 +30,7 @@ const ProgramarCita = () => {
   const [enviando, setEnviando] = useState(false);
 
   const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+  console.log('DEBUG usuario:', usuario);
   const esDocente = usuario.rol === 'docente';
 
   // Lista genérica de tratamientos
