@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import { Menu, X, Home, UserPlus, Calendar, FileText, LayoutDashboard, LogOut, Settings, CheckCircle } from 'lucide-react';
+import { Menu, X, Home, UserPlus, Calendar, FileText, LayoutDashboard, LogOut, Settings, CheckCircle, Users } from 'lucide-react';
 
 const Layout = ({ usuario }) => {
   const [menuAbierto, setMenuAbierto] = useState(false);
@@ -31,6 +32,7 @@ const Layout = ({ usuario }) => {
     { path: '/nuevo-paciente', icon: UserPlus, label: 'Nuevo Paciente', roles: ['estudiante'] },
     { path: '/programar-cita', icon: Calendar, label: 'Programar Cita', roles: ['estudiante'] },
     { path: '/reportar', icon: FileText, label: 'Reportar Tratamiento', roles: ['estudiante'] },
+    { path: '/mis-pacientes', icon: Users, label: 'Mis Pacientes', roles: ['estudiante'] },
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', roles: ['docente'] },
     { path: '/admin', icon: Settings, label: 'Administración', roles: ['docente'] },
   ];

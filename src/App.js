@@ -8,6 +8,7 @@ import ProgramarCita from './components/ProgramarCita';
 import ReportarTratamiento from './components/ReportarTratamiento';
 import Dashboard from './components/Dashboard';
 import AdminPanel from './components/AdminPanel';
+import MisPacientes from './components/MisPacientes';
 
 // Componente de inicio
 const Inicio = ({ usuario }) => (
@@ -95,6 +96,7 @@ function App() {
           <Route path="reportar" element={<ReportarTratamiento />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="admin" element={<AdminPanel />} />
+          <Route path="mis-pacientes" element={<MisPacientes />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

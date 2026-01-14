@@ -1,0 +1,373 @@
+// src/components/MisPacientes.jsx
+import React, { useState, useEffect } from 'react';
+import { Users, Eye, Edit, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle, X } from 'lucide-react';
+import { SUPABASE_CONFIG } from '../config/api';
+
+const MisPacientes = () => {
+  const [pacientes, setPacientes] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState(null);
+  const [pacienteExpandido, setPacienteExpandido] = useState(null);
+  const [modalEditar, setModalEditar] = useState(null);
+  const [descripcionCambio, setDescripcionCambio] = useState('');
+  const [enviandoCambio, setEnviandoCambio] = useState(false);
+  const [mensajeExito, setMensajeExito] = useState(null);
+
+  const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+
+  useEffect(() => {
+    cargarPacientes();
+  }, []);
+
+  const cargarPacientes = async () => {
+    try {
+      setCargando(true);
+      
+      // Buscar pacientes donde el estudiante es el actual
+      const response = await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/pacientes?estudiante_actual_id=eq.${usuario.id}&select=*,planes_tratamiento(*)`,
+        {
+          headers: {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+          }
+        }
+      );
+
+      if (!response.ok) throw new Error('Error al cargar pacientes');
+      
+      const data = await response.json();
+      setPacientes(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const toggleExpansion = (pacienteId) => {
+    setPacienteExpandido(pacienteExpandido === pacienteId ? null : pacienteId);
+  };
+
+  const abrirModalEditar = (paciente) => {
+    setModalEditar(paciente);
+    setDescripcionCambio('');
+    setMensajeExito(null);
+  };
+
+  const cerrarModal = () => {
+    setModalEditar(null);
+    setDescripcionCambio('');
+  };
+
+  const enviarCambio = async () => {
+    if (!descripcionCambio.trim()) return;
+    
+    setEnviandoCambio(true);
+    try {
+      const planActivo = modalEditar.planes_tratamiento?.find(p => p.estado === 'aprobado');
+      
+      const response = await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/modificaciones_plan`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            plan_id: planActivo?.id,
+            paciente_id: modalEditar.id,
+            estudiante_id: usuario.id,
+            tipo_modificacion: 'modificar',
+            descripcion_cambio: descripcionCambio,
+            estado: 'pendiente'
+          })
+        }
+      );
+
+      if (!response.ok) throw new Error('Error al enviar cambio');
+      
+      setMensajeExito('Cambio enviado. La Dra. Johana recibirá una notificación para aprobarlo.');
+      setDescripcionCambio('');
+      
+      // TODO: Enviar notificación WhatsApp a Johana
+      
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setEnviandoCambio(false);
+    }
+  };
+
+  const formatearPlan = (planCompleto) => {
+    if (!planCompleto) return null;
+    
+    try {
+      const plan = typeof planCompleto === 'string' ? JSON.parse(planCompleto) : planCompleto;
+      return plan;
+    } catch {
+      return null;
+    }
+  };
+
+  const renderPlan = (plan) => {
+    if (!plan) return <p className="text-gray-500">Sin plan de tratamiento</p>;
+
+    return (
+      <div className="space-y-4 text-sm">
+        {/* Fase Higiénica Periodontal */}
+        {plan.fase_higienica_periodontal && (
+          <div>
+            <h5 className="font-semibold text-blue-800 mb-2">Fase Higiénica Periodontal</h5>
+            <ul className="list-disc list-inside space-y-1 text-gray-700">
+              {plan.fase_higienica_periodontal.profilaxis && <li>Profilaxis</li>}
+              {plan.fase_higienica_periodontal.detartraje?.generalizado && <li>Detartraje generalizado</li>}
+              {plan.fase_higienica_periodontal.pulido_coronal?.dientes?.length > 0 && (
+                <li>Pulido coronal: {plan.fase_higienica_periodontal.pulido_coronal.dientes.join(', ')}</li>
+              )}
+              {plan.fase_higienica_periodontal.raspaje_alisado_radicular?.dientes?.length > 0 && (
+                <li>Raspaje y alisado radicular: {plan.fase_higienica_periodontal.raspaje_alisado_radicular.dientes.join(', ')}</li>
+              )}
+            </ul>
+          </div>
+        )}
+
+        {/* Fase Higiénica Dental */}
+        {plan.fase_higienica_dental && (
+          <div>
+            <h5 className="font-semibold text-blue-800 mb-2">Fase Higiénica Dental</h5>
+            <ul className="list-disc list-inside space-y-1 text-gray-700">
+              {plan.fase_higienica_dental.operatoria?.dientes?.length > 0 && (
+                <li>Operatoria: {plan.fase_higienica_dental.operatoria.dientes.join(', ')}</li>
+              )}
+              {plan.fase_higienica_dental.exodoncias?.length > 0 && (
+                <li>Exodoncias: {plan.fase_higienica_dental.exodoncias.join(', ')}</li>
+              )}
+              {plan.fase_higienica_dental.provisionales?.dientes?.length > 0 && (
+                <li>Provisionales: {plan.fase_higienica_dental.provisionales.dientes.join(', ')}</li>
+              )}
+            </ul>
+          </div>
+        )}
+
+        {/* Fase Reevaluativa */}
+        {plan.fase_reevaluativa && (
+          <div>
+            <h5 className="font-semibold text-blue-800 mb-2">Fase Reevaluativa</h5>
+            <p className="text-gray-700">✓ Incluida en el plan</p>
+          </div>
+        )}
+
+        {/* Fase Correctiva Inicial */}
+        {plan.fase_correctiva_inicial && (
+          <div>
+            <h5 className="font-semibold text-blue-800 mb-2">Fase Correctiva Inicial</h5>
+            <ul className="list-disc list-inside space-y-1 text-gray-700">
+              {plan.fase_correctiva_inicial.endodoncia?.length > 0 && (
+                <li>Endodoncia: {plan.fase_correctiva_inicial.endodoncia.join(', ')}</li>
+              )}
+              {plan.fase_correctiva_inicial.postes?.length > 0 && (
+                <li>Postes: {plan.fase_correctiva_inicial.postes.join(', ')}</li>
+              )}
+              {plan.fase_correctiva_inicial.nucleos?.length > 0 && (
+                <li>Núcleos: {plan.fase_correctiva_inicial.nucleos.join(', ')}</li>
+              )}
+              {plan.fase_correctiva_inicial.reconstruccion_munon?.length > 0 && (
+                <li>Reconstrucción muñón: {plan.fase_correctiva_inicial.reconstruccion_munon.join(', ')}</li>
+              )}
+            </ul>
+          </div>
+        )}
+
+        {/* Fase Correctiva Final */}
+        {plan.fase_correctiva_final && (
+          <div>
+            <h5 className="font-semibold text-blue-800 mb-2">Fase Correctiva Final</h5>
+            <ul className="list-disc list-inside space-y-1 text-gray-700">
+              {plan.fase_correctiva_final.coronas?.length > 0 && (
+                <li>Coronas: {plan.fase_correctiva_final.coronas.join(', ')}</li>
+              )}
+              {plan.fase_correctiva_final.incrustaciones?.length > 0 && (
+                <li>Incrustaciones: {plan.fase_correctiva_final.incrustaciones.map(i => 
+                  typeof i === 'object' ? `${i.diente} (${i.tipo})` : i
+                ).join(', ')}</li>
+              )}
+              {plan.fase_correctiva_final.protesis_removible && <li>Prótesis removible</li>}
+              {plan.fase_correctiva_final.protesis_total && <li>Prótesis total</li>}
+            </ul>
+          </div>
+        )}
+
+        {/* Fase Mantenimiento */}
+        {plan.fase_mantenimiento && (
+          <div>
+            <h5 className="font-semibold text-blue-800 mb-2">Fase de Mantenimiento</h5>
+            <p className="text-gray-700">✓ Incluida en el plan</p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  if (cargando) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="animate-spin text-blue-600" size={32} />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-2">
+        <AlertCircle className="text-red-600" size={20} />
+        <span className="text-red-800">{error}</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto">
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+        {/* Header */}
+        <div className="bg-teal-600 text-white px-6 py-4">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Users size={24} />
+            Mis Pacientes
+          </h2>
+          <p className="text-teal-100 text-sm mt-1">
+            Pacientes asignados a ti. Puedes ver y proponer cambios a sus planes.
+          </p>
+        </div>
+
+        {/* Lista de pacientes */}
+        <div className="p-6">
+          {pacientes.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Users size={48} className="mx-auto mb-4 opacity-50" />
+              <p>No tienes pacientes asignados aún.</p>
+              <p className="text-sm mt-2">Registra un nuevo paciente para comenzar.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {pacientes.map(paciente => {
+                const planActivo = paciente.planes_tratamiento?.find(p => p.estado === 'aprobado');
+                const planFormateado = formatearPlan(planActivo?.plan_completo);
+                const estaExpandido = pacienteExpandido === paciente.id;
+
+                return (
+                  <div key={paciente.id} className="border rounded-lg overflow-hidden">
+                    {/* Cabecera del paciente */}
+                    <div 
+                      className="bg-gray-50 px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition"
+                      onClick={() => toggleExpansion(paciente.id)}
+                    >
+                      <div>
+                        <h3 className="font-semibold text-gray-900">
+                          {paciente.primer_nombre} {paciente.segundo_nombre || ''} {paciente.primer_apellido} {paciente.segundo_apellido || ''}
+                        </h3>
+                        <p className="text-sm text-gray-600">
+                          CC: {paciente.cedula} | Tel: {paciente.celular}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); abrirModalEditar(paciente); }}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                          title="Proponer cambio al plan"
+                        >
+                          <Edit size={18} />
+                        </button>
+                        {estaExpandido ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                      </div>
+                    </div>
+
+                    {/* Plan de tratamiento expandido */}
+                    {estaExpandido && (
+                      <div className="px-4 py-4 bg-white border-t">
+                        <h4 className="font-semibold text-gray-800 mb-3">Plan de Tratamiento Activo</h4>
+                        {renderPlan(planFormateado)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal para proponer cambio */}
+      {modalEditar && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="px-6 py-4 border-b flex items-center justify-between">
+              <h3 className="text-lg font-semibold">
+                Proponer cambio para {modalEditar.primer_nombre} {modalEditar.primer_apellido}
+              </h3>
+              <button onClick={cerrarModal} className="text-gray-500 hover:text-gray-700">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {mensajeExito ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-center gap-2">
+                  <CheckCircle className="text-green-600" size={20} />
+                  <span className="text-green-800">{mensajeExito}</span>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Describe el cambio o adición que necesitas hacer al plan de tratamiento. 
+                    La Dra. Johana recibirá una notificación para aprobarlo.
+                  </p>
+
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Descripción del cambio
+                    </label>
+                    <textarea
+                      value={descripcionCambio}
+                      onChange={(e) => setDescripcionCambio(e.target.value)}
+                      placeholder="Ej: Agregar endodoncia en diente 36 debido a caries profunda detectada en radiografía..."
+                      className="w-full border border-gray-300 rounded-lg px-4 py-2 h-32 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      onClick={cerrarModal}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={enviarCambio}
+                      disabled={!descripcionCambio.trim() || enviandoCambio}
+                      className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+                    >
+                      {enviandoCambio ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />
+                          Enviando...
+                        </>
+                      ) : (
+                        'Enviar para aprobación'
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default MisPacientes;
