@@ -52,7 +52,7 @@ const Inicio = ({ usuario }) => (
       )}
 
       <div className="mt-8 p-4 bg-gray-50 rounded-lg">
-        <h3 className="font-bold text-gray-700 mb-2">📅 Horarios de Clínica</h3>
+        <h3 className="font-bold text-gray-700 mb-2">📅 Horarios habilitados del sistema</h3>
         <ul className="text-sm text-gray-600 space-y-1">
           <li>• <strong>Miércoles:</strong> 1:00 PM - 7:00 PM</li>
           <li>• <strong>Viernes:</strong> 8:00 AM - 2:00 PM</li>
