@@ -143,7 +143,7 @@ const Login = ({ onLoginSuccess }) => {
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <img src="/logo-pag.png" alt="CES" className="w-16 h-16 mx-auto mb-4 rounded-full" />
+          <img src="/logo-pagina.png" alt="CES" className="w-16 h-16 mx-auto mb-4 rounded-full" />
           <h1 className="text-2xl font-bold text-gray-900">Sistema Clínico CES</h1>
           <p className="text-gray-600 mt-2">Dra. Johana Escobar</p>
         </div>
