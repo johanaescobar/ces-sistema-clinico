@@ -546,7 +546,6 @@ const ProgramarCita = () => {
                 <p className="text-sm text-gray-500 font-medium mb-2">⚪ Otros tratamientos:</p>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {tratamientosGenericos
-                    .filter(t => !tratamientosPlan.some(tp => tp.startsWith(t)))
                     .map((t, i) => (
                       <button
                         key={i}
