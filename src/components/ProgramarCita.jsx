@@ -600,7 +600,7 @@ const ProgramarCita = () => {
       setCitaCreada(Array.isArray(cita) ? cita[0] : cita);
 
       // 2. Enviar a Google Sheets (no bloquea si falla)
-      enviarAGoogleSheets(
+      const sheetsResult = await enviarAGoogleSheets(
         pacienteSeleccionado,
         fechaSeleccionada,
         horaSeleccionada,
@@ -608,6 +608,11 @@ const ProgramarCita = () => {
         tratamientoSeleccionado,
         observacion.trim()
       );
+
+      if (!sheetsResult || !sheetsResult.ok) {
+        console.warn('Google Sheets falló:', sheetsResult);
+        alert('⚠️ Cita guardada, pero no se pudo sincronizar con Google Sheets.\n\nContacta a la Dra. Escobar para verificar.');
+      }
 
       setPaso(7);
     } catch (err) {
