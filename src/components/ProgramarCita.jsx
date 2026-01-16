@@ -723,15 +723,23 @@ const ProgramarCita = () => {
                 Selecciona la fecha ({diaClinica})
               </h3>
 
-              <input
-                type="date"
-                onChange={(e) => validarFecha(e.target.value)}
-                className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
-                min={new Date().toISOString().split('T')[0]}
-              />
+              <div 
+                className="w-full p-4 border rounded-lg hover:bg-green-50 hover:border-green-300 transition cursor-pointer flex items-center justify-between"
+                onClick={() => document.getElementById('selectorFecha').showPicker()}
+              >
+                <span className="text-gray-600">Seleccionar fecha</span>
+                <Calendar size={20} className="text-gray-400" />
+                <input
+                  id="selectorFecha"
+                  type="date"
+                  onChange={(e) => validarFecha(e.target.value)}
+                  className="absolute opacity-0 pointer-events-none"
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
 
               <p className="text-sm text-gray-500 mt-2">
-                Solo se permiten fechas en {diaClinica} que no sean festivos.
+                Solo se permite agendar citas en días habilitados para la clínica.
               </p>
 
               <button
