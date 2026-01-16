@@ -681,18 +681,29 @@ const ProgramarCita = () => {
               </h3>
 
               <div className="space-y-3">
-                {horariosConfig.map(h => (
-                  <button
-                    key={h.id}
-                    onClick={() => seleccionarDia(h.dia_semana)}
-                    className="w-full text-left p-4 border rounded-lg hover:bg-green-50 hover:border-green-300 transition"
-                  >
-                    <div className="font-medium capitalize">{h.dia_semana}</div>
-                    <div className="text-sm text-gray-500">
-                      {h.hora_inicio.slice(0, 5)} - {h.hora_fin.slice(0, 5)}
-                    </div>
-                  </button>
-                ))}
+                {horariosConfig.map(h => {
+                  const formatoHora = (hora24) => {
+                    const [hh, mm] = hora24.split(':').map(Number);
+                    const periodo = hh >= 12 ? 'PM' : 'AM';
+                    const hora12 = hh > 12 ? hh - 12 : (hh === 0 ? 12 : hh);
+                    return `${hora12}:${mm.toString().padStart(2, '0')} ${periodo}`;
+                  };
+                  const horaClinicaInicio = h.hora_clinica_inicio || h.hora_inicio;
+                  const horaClinicaFin = h.hora_clinica_fin || h.hora_fin;
+                  
+                  return (
+                    <button
+                      key={h.id}
+                      onClick={() => seleccionarDia(h.dia_semana)}
+                      className="w-full text-left p-4 border rounded-lg hover:bg-green-50 hover:border-green-300 transition"
+                    >
+                      <div className="font-medium capitalize">{h.dia_semana}</div>
+                      <div className="text-sm text-gray-500">
+                        {formatoHora(horaClinicaInicio)} - {formatoHora(horaClinicaFin)}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
 
               <button
