@@ -4,8 +4,8 @@ import { Mail } from 'lucide-react';
 import { API_ENDPOINTS } from '../config/api';
 
 // ============================================================
-// MODO DESARROLLO: true = sin WAHA, false = producción con WAHA
-// Cuando WAHA funcione, cambiar a false
+// MODO DESARROLLO: true = sin validación WAB, false = producción con WAB
+
 const MODO_DEV = true;
 const CODIGOS_DEV = {
   'jescobarp@ces.edu.co': '111111',  // Johana
