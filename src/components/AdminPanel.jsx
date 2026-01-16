@@ -10,9 +10,11 @@ import { SUPABASE_CONFIG } from '../config/api';
 // Tabs del panel
 const TABS = [
   { id: 'estudiantes', label: 'Estudiantes', icon: Users },
+  { id: 'pacientes', label: 'Pacientes', icon: UserPlus },
+  { id: 'citas', label: 'Citas', icon: Calendar },
   { id: 'horarios', label: 'Horarios', icon: Clock },
   { id: 'festivos', label: 'Festivos', icon: Calendar },
-  { id: 'logs', label: 'Logs', icon: AlertTriangle },
+  { id: 'config', label: 'Config', icon: Settings },
   { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3 },
 ];
 
@@ -55,6 +57,277 @@ const GestionEstudiantes = () => {
       setCargando(false);
     }
   };
+
+  // =============================================
+// COMPONENTE: GESTIÓN DE PACIENTES
+// =============================================
+const GestionPacientes = () => {
+  const [pacientes, setPacientes] = useState([]);
+  const [estudiantes, setEstudiantes] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [filtro, setFiltro] = useState('');
+  const [error, setError] = useState('');
+
+  const cargar = async () => {
+    setCargando(true);
+    try {
+      const [pacData, estData] = await Promise.all([
+        supabaseFetch('pacientes?select=*,usuarios!pacientes_estudiante_actual_id_fkey(nombre_completo)&order=created_at.desc'),
+        supabaseFetch('usuarios?rol=eq.estudiante&activo=eq.true&select=id,nombre_completo')
+      ]);
+      setPacientes(pacData || []);
+      setEstudiantes(estData || []);
+    } catch (err) {
+      setError('Error al cargar pacientes');
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const cambiarEstudiante = async (pacienteId, nuevoEstudianteId) => {
+    try {
+      await supabaseFetch(`pacientes?id=eq.${pacienteId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estudiante_actual_id: nuevoEstudianteId || null })
+      });
+      cargar();
+    } catch (err) {
+      setError('Error al asignar estudiante');
+    }
+  };
+
+  const pacientesFiltrados = pacientes.filter(p => {
+    const nombre = `${p.primer_nombre} ${p.segundo_nombre || ''} ${p.primer_apellido} ${p.segundo_apellido || ''}`.toLowerCase();
+    return nombre.includes(filtro.toLowerCase()) || p.cedula.includes(filtro);
+  });
+
+  if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-lg font-bold">Pacientes ({pacientes.length})</h3>
+        <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
+          <RefreshCw size={20} /> Actualizar
+        </button>
+      </div>
+
+      {error && <div className="bg-red-100 text-red-700 px-4 py-2 rounded-lg mb-4">{error}</div>}
+
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Buscar por nombre o cédula..."
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+          className="w-full md:w-96 border rounded-lg px-4 py-2"
+        />
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="text-left p-3 font-semibold">Paciente</th>
+              <th className="text-left p-3 font-semibold">Cédula</th>
+              <th className="text-left p-3 font-semibold">Celular</th>
+              <th className="text-left p-3 font-semibold">Estudiante Asignado</th>
+              <th className="text-left p-3 font-semibold">Registrado</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pacientesFiltrados.map((p) => (
+              <tr key={p.id} className="border-b hover:bg-gray-50">
+                <td className="p-3">
+                  {p.primer_nombre} {p.segundo_nombre || ''} {p.primer_apellido} {p.segundo_apellido || ''}
+                </td>
+                <td className="p-3">{p.cedula}</td>
+                <td className="p-3">{p.celular}</td>
+                <td className="p-3">
+                  <select
+                    value={p.estudiante_actual_id || ''}
+                    onChange={(e) => cambiarEstudiante(p.id, e.target.value)}
+                    className="border rounded px-2 py-1 text-sm w-full"
+                  >
+                    <option value="">Sin asignar</option>
+                    {estudiantes.map(e => (
+                      <option key={e.id} value={e.id}>{e.nombre_completo}</option>
+                    ))}
+                  </select>
+                </td>
+                <td className="p-3 text-sm text-gray-500">
+                  {new Date(p.created_at).toLocaleDateString('es-CO')}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {pacientesFiltrados.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          No se encontraron pacientes
+        </div>
+      )}
+    </div>
+  );
+};
+
+// =============================================
+// COMPONENTE: GESTIÓN DE CITAS
+// =============================================
+const GestionCitas = () => {
+  const [citas, setCitas] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [filtroEstudiante, setFiltroEstudiante] = useState('');
+  const [filtroFecha, setFiltroFecha] = useState('');
+  const [estudiantes, setEstudiantes] = useState([]);
+
+  const formatearHora = (hora24) => {
+    if (!hora24) return '';
+    const [h, m] = hora24.split(':').map(Number);
+    const periodo = h >= 12 ? 'PM' : 'AM';
+    const hora12 = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+    return `${hora12}:${m.toString().padStart(2, '0')} ${periodo}`;
+  };
+
+  const cargar = async () => {
+    setCargando(true);
+    try {
+      const [citasData, estData] = await Promise.all([
+        supabaseFetch('citas?select=*,pacientes(primer_nombre,primer_apellido,cedula),usuarios!citas_estudiante_id_fkey(nombre_completo)&order=fecha_cita.desc,hora'),
+        supabaseFetch('usuarios?rol=eq.estudiante&activo=eq.true&select=id,nombre_completo')
+      ]);
+      setCitas(citasData || []);
+      setEstudiantes(estData || []);
+    } catch (err) {
+      console.error('Error cargando citas:', err);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const citasFiltradas = citas.filter(c => {
+    const cumpleFecha = !filtroFecha || c.fecha_cita === filtroFecha;
+    const cumpleEstudiante = !filtroEstudiante || c.estudiante_id === filtroEstudiante;
+    return cumpleFecha && cumpleEstudiante;
+  });
+
+  const cancelarCita = async (id) => {
+    if (!window.confirm('¿Cancelar esta cita?')) return;
+    try {
+      await supabaseFetch(`citas?id=eq.${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado: 'cancelada' })
+      });
+      cargar();
+    } catch (err) {
+      console.error('Error cancelando cita:', err);
+    }
+  };
+
+  if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-lg font-bold">Citas Programadas ({citas.length})</h3>
+        <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
+          <RefreshCw size={20} /> Actualizar
+        </button>
+      </div>
+
+      <div className="flex gap-4 mb-4 flex-wrap">
+        <select
+          value={filtroEstudiante}
+          onChange={(e) => setFiltroEstudiante(e.target.value)}
+          className="border rounded-lg px-4 py-2"
+        >
+          <option value="">Todos los estudiantes</option>
+          {estudiantes.map(e => (
+            <option key={e.id} value={e.id}>{e.nombre_completo}</option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={filtroFecha}
+          onChange={(e) => setFiltroFecha(e.target.value)}
+          className="border rounded-lg px-4 py-2"
+        />
+        {(filtroEstudiante || filtroFecha) && (
+          <button
+            onClick={() => { setFiltroEstudiante(''); setFiltroFecha(''); }}
+            className="text-gray-500 hover:text-gray-700 flex items-center gap-1"
+          >
+            <X size={16} /> Limpiar filtros
+          </button>
+        )}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="text-left p-3 font-semibold">Fecha</th>
+              <th className="text-left p-3 font-semibold">Hora</th>
+              <th className="text-left p-3 font-semibold">Paciente</th>
+              <th className="text-left p-3 font-semibold">Estudiante</th>
+              <th className="text-left p-3 font-semibold">Tratamiento</th>
+              <th className="text-center p-3 font-semibold">Estado</th>
+              <th className="text-center p-3 font-semibold">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {citasFiltradas.map((c) => (
+              <tr key={c.id} className="border-b hover:bg-gray-50">
+                <td className="p-3">
+                  {new Date(c.fecha_cita + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })}
+                </td>
+                <td className="p-3">{formatearHora(c.hora)}</td>
+                <td className="p-3">
+                  {c.pacientes?.primer_nombre} {c.pacientes?.primer_apellido}
+                  <span className="text-xs text-gray-500 block">CC: {c.pacientes?.cedula}</span>
+                </td>
+                <td className="p-3 text-sm">{c.usuarios?.nombre_completo}</td>
+                <td className="p-3 text-sm">{c.tratamiento_programado}</td>
+                <td className="p-3 text-center">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    c.estado === 'programada' ? 'bg-blue-100 text-blue-700' :
+                    c.estado === 'completada' ? 'bg-green-100 text-green-700' :
+                    'bg-red-100 text-red-700'
+                  }`}>
+                    {c.estado}
+                  </span>
+                </td>
+                <td className="p-3 text-center">
+                  {c.estado === 'programada' && (
+                    <button
+                      onClick={() => cancelarCita(c.id)}
+                      className="text-red-600 hover:text-red-800"
+                      title="Cancelar cita"
+                    >
+                      <XCircle size={18} />
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {citasFiltradas.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          No se encontraron citas
+        </div>
+      )}
+    </div>
+  );
+};
 
   useEffect(() => { cargar(); }, []);
 
@@ -696,6 +969,98 @@ const Estadisticas = () => {
 };
 
 // =============================================
+// COMPONENTE: CONFIGURACIÓN
+// =============================================
+const GestionConfig = () => {
+  const [config, setConfig] = useState({ max_citas_por_dia: 2 });
+  const [cargando, setCargando] = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [mensaje, setMensaje] = useState('');
+
+  const cargar = async () => {
+    setCargando(true);
+    try {
+      const data = await supabaseFetch('config_sistema?select=*');
+      if (data && data.length > 0) {
+        setConfig(data[0]);
+      }
+    } catch (err) {
+      console.error('Error cargando config:', err);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const guardar = async () => {
+    setGuardando(true);
+    setMensaje('');
+    try {
+      // Verificar si existe registro
+      const existe = await supabaseFetch('config_sistema?select=id');
+      
+      if (existe && existe.length > 0) {
+        await supabaseFetch(`config_sistema?id=eq.${existe[0].id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ max_citas_por_dia: config.max_citas_por_dia })
+        });
+      } else {
+        await supabaseFetch('config_sistema', {
+          method: 'POST',
+          body: JSON.stringify({ max_citas_por_dia: config.max_citas_por_dia })
+        });
+      }
+      setMensaje('✅ Configuración guardada');
+    } catch (err) {
+      setMensaje('❌ Error al guardar');
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
+
+  return (
+    <div>
+      <h3 className="text-lg font-bold mb-6">Configuración del Sistema</h3>
+
+      <div className="bg-gray-50 p-6 rounded-lg border max-w-md">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Máximo de citas por día por estudiante
+        </label>
+        <input
+          type="number"
+          min="1"
+          max="10"
+          value={config.max_citas_por_dia}
+          onChange={(e) => setConfig({ ...config, max_citas_por_dia: parseInt(e.target.value) || 1 })}
+          className="w-full border rounded-lg px-4 py-2 text-lg"
+        />
+        <p className="text-sm text-gray-500 mt-2">
+          Número máximo de pacientes que un estudiante puede agendar en un mismo día.
+        </p>
+
+        <button
+          onClick={guardar}
+          disabled={guardando}
+          className="mt-4 flex items-center gap-2 bg-amber-600 text-white px-6 py-2 rounded-lg hover:bg-amber-700 disabled:bg-gray-400"
+        >
+          {guardando ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+          Guardar
+        </button>
+
+        {mensaje && (
+          <p className={`mt-3 text-sm ${mensaje.includes('✅') ? 'text-green-600' : 'text-red-600'}`}>
+            {mensaje}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// =============================================
 // COMPONENTE PRINCIPAL: ADMIN PANEL
 // =============================================
 const AdminPanel = () => {
@@ -736,9 +1101,11 @@ const AdminPanel = () => {
         {/* Contenido */}
         <div className="p-6">
           {tabActivo === 'estudiantes' && <GestionEstudiantes />}
+          {tabActivo === 'pacientes' && <GestionPacientes />}
+          {tabActivo === 'citas' && <GestionCitas />}
           {tabActivo === 'horarios' && <GestionHorarios />}
           {tabActivo === 'festivos' && <GestionFestivos />}
-          {tabActivo === 'logs' && <GestionLogs />}
+          {tabActivo === 'config' && <GestionConfig />}
           {tabActivo === 'estadisticas' && <Estadisticas />}
         </div>
       </div>
