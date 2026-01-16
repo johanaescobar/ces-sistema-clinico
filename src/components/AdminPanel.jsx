@@ -242,16 +242,26 @@ const GestionPacientes = () => {
   useEffect(() => { cargar(); }, []);
 
   const cambiarEstudiante = async (pacienteId, nuevoEstudianteId) => {
-    try {
-      await supabaseFetch(`pacientes?id=eq.${pacienteId}`, {
+  try {
+    // 1. Reasignar paciente
+    await supabaseFetch(`pacientes?id=eq.${pacienteId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ estudiante_actual_id: nuevoEstudianteId || null })
+    });
+
+    // 2. Reasignar citas programadas de ese paciente al nuevo estudiante
+    if (nuevoEstudianteId) {
+      await supabaseFetch(`citas?paciente_id=eq.${pacienteId}&estado=eq.programada`, {
         method: 'PATCH',
-        body: JSON.stringify({ estudiante_actual_id: nuevoEstudianteId || null })
+        body: JSON.stringify({ estudiante_id: nuevoEstudianteId })
       });
-      cargar();
-    } catch (err) {
-      setError('Error al asignar estudiante');
     }
-  };
+
+    cargar();
+  } catch (err) {
+    setError('Error al asignar estudiante');
+  }
+};
 
   const pacientesFiltrados = pacientes.filter(p => {
     const nombre = `${p.primer_nombre} ${p.segundo_nombre || ''} ${p.primer_apellido} ${p.segundo_apellido || ''}`.toLowerCase();
