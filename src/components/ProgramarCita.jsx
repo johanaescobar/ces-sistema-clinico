@@ -24,6 +24,17 @@ const ProgramarCita = () => {
   const [fechaSeleccionada, setFechaSeleccionada] = useState('');
   const [horaSeleccionada, setHoraSeleccionada] = useState('');
   const [observacion, setObservacion] = useState('');
+  // Estados para nuevo paciente
+  const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false);
+  const [nuevoPaciente, setNuevoPaciente] = useState({
+    primer_nombre: '',
+    segundo_nombre: '',
+    primer_apellido: '',
+    segundo_apellido: '',
+    cedula: '',
+    celular: ''
+  });
+  const [guardandoPaciente, setGuardandoPaciente] = useState(false)
   
   // Resultado
   const [, setCitaCreada] = useState(null);
@@ -331,6 +342,75 @@ const ProgramarCita = () => {
     setPaso(6);
   };
 
+  const guardarNuevoPaciente = async () => {
+    setGuardandoPaciente(true);
+    setError('');
+
+    try {
+      // Verificar si ya existe por cédula
+      const resExiste = await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/pacientes?cedula=eq.${nuevoPaciente.cedula}`,
+        {
+          headers: {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+          }
+        }
+      );
+      const existentes = await resExiste.json();
+
+      let paciente;
+
+      if (Array.isArray(existentes) && existentes.length > 0) {
+        // Ya existe, usar el existente
+        paciente = existentes[0];
+      } else {
+        // Crear nuevo paciente
+        const response = await fetch(
+          `${SUPABASE_CONFIG.URL}/rest/v1/pacientes`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_CONFIG.ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+              primer_nombre: nuevoPaciente.primer_nombre.trim(),
+              segundo_nombre: nuevoPaciente.segundo_nombre.trim() || null,
+              primer_apellido: nuevoPaciente.primer_apellido.trim(),
+              segundo_apellido: nuevoPaciente.segundo_apellido.trim() || null,
+              cedula: nuevoPaciente.cedula.trim(),
+              celular: nuevoPaciente.celular.trim(),
+              registrado_por: usuario.id,
+              estudiante_actual_id: usuario.id
+            })
+          }
+        );
+
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.message || 'Error al crear paciente');
+        }
+
+        const data = await response.json();
+        paciente = Array.isArray(data) ? data[0] : data;
+      }
+
+      // Seleccionar el paciente y continuar
+      setPacienteSeleccionado(paciente);
+      setTratamientosPlan([]); // Sin plan de tratamiento
+      setNuevoPaciente({ primer_nombre: '', segundo_nombre: '', primer_apellido: '', segundo_apellido: '', cedula: '', celular: '' });
+      setPaso(2);
+
+    } catch (err) {
+      setError('Error al guardar paciente: ' + err.message);
+    } finally {
+      setGuardandoPaciente(false);
+    }
+  };
+
   const confirmarCita = async () => {
     if (!observacion.trim()) {
       setError('La observación es obligatoria');
@@ -472,9 +552,7 @@ const ProgramarCita = () => {
           </div>
         )}
 
-        {/* Contenido según paso */}
-        <div className="p-6">
-          {/* PASO 1: Seleccionar paciente */}
+        {/* PASO 1: Seleccionar paciente */}
           {paso === 1 && (
             <div>
               <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
@@ -482,27 +560,44 @@ const ProgramarCita = () => {
                 Selecciona el paciente
               </h3>
               
+              {/* Botón Nuevo Paciente */}
+              <button
+                onClick={() => setPaso(10)}
+                className="w-full text-left p-4 mb-4 border-2 border-dashed border-blue-300 rounded-lg hover:bg-blue-50 hover:border-blue-500 transition flex items-center gap-3"
+              >
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 text-xl font-bold">+</span>
+                </div>
+                <div>
+                  <div className="font-medium text-blue-600">Nuevo Paciente</div>
+                  <div className="text-sm text-gray-500">Paciente sin plan de tratamiento</div>
+                </div>
+              </button>
+
               {pacientes.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">
-                  No tienes pacientes asignados aún.
+                <p className="text-gray-500 text-center py-4">
+                  No tienes pacientes con plan asignado.
                 </p>
               ) : (
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {pacientes.map(p => (
-                    <button
-                      key={p.id}
-                      onClick={() => seleccionarPaciente(p)}
-                      className="w-full text-left p-4 border rounded-lg hover:bg-green-50 hover:border-green-300 transition"
-                    >
-                      <div className="font-medium">
-                        {p.primer_nombre} {p.segundo_nombre || ''} {p.primer_apellido} {p.segundo_apellido || ''}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        CC: {p.cedula} | Tel: {p.celular}
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <p className="text-sm text-gray-500 mb-2">Pacientes con plan aprobado:</p>
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {pacientes.map(p => (
+                      <button
+                        key={p.id}
+                        onClick={() => seleccionarPaciente(p)}
+                        className="w-full text-left p-4 border rounded-lg hover:bg-green-50 hover:border-green-300 transition"
+                      >
+                        <div className="font-medium">
+                          {p.primer_nombre} {p.segundo_nombre || ''} {p.primer_apellido} {p.segundo_apellido || ''}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          CC: {p.cedula} | Tel: {p.celular}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -725,6 +820,113 @@ const ProgramarCita = () => {
               >
                 Programar otra cita
               </button>
+            </div>
+          )}
+
+          {/* PASO 10: Formulario Nuevo Paciente */}
+          {paso === 10 && (
+            <div>
+              <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
+                <User size={20} />
+                Datos del nuevo paciente
+              </h3>
+
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Primer nombre *</label>
+                    <input
+                      type="text"
+                      value={nuevoPaciente.primer_nombre}
+                      onChange={(e) => setNuevoPaciente({...nuevoPaciente, primer_nombre: e.target.value})}
+                      className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Ej: Gloria"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Segundo nombre</label>
+                    <input
+                      type="text"
+                      value={nuevoPaciente.segundo_nombre}
+                      onChange={(e) => setNuevoPaciente({...nuevoPaciente, segundo_nombre: e.target.value})}
+                      className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Ej: Luz"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Primer apellido *</label>
+                    <input
+                      type="text"
+                      value={nuevoPaciente.primer_apellido}
+                      onChange={(e) => setNuevoPaciente({...nuevoPaciente, primer_apellido: e.target.value})}
+                      className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Ej: Londoño"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Segundo apellido</label>
+                    <input
+                      type="text"
+                      value={nuevoPaciente.segundo_apellido}
+                      onChange={(e) => setNuevoPaciente({...nuevoPaciente, segundo_apellido: e.target.value})}
+                      className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Ej: García"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Cédula *</label>
+                    <input
+                      type="text"
+                      value={nuevoPaciente.cedula}
+                      onChange={(e) => setNuevoPaciente({...nuevoPaciente, cedula: e.target.value})}
+                      className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Ej: 42875672"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-1">Celular *</label>
+                    <input
+                      type="text"
+                      value={nuevoPaciente.celular}
+                      onChange={(e) => setNuevoPaciente({...nuevoPaciente, celular: e.target.value})}
+                      className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Ej: 3136415316"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-2 mt-6">
+                <button
+                  onClick={() => {
+                    setPaso(1);
+                    setNuevoPaciente({ primer_nombre: '', segundo_nombre: '', primer_apellido: '', segundo_apellido: '', cedula: '', celular: '' });
+                  }}
+                  className="flex-1 px-4 py-3 border rounded-lg hover:bg-gray-50 transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={guardarNuevoPaciente}
+                  disabled={guardandoPaciente || !nuevoPaciente.primer_nombre || !nuevoPaciente.primer_apellido || !nuevoPaciente.cedula || !nuevoPaciente.celular}
+                  className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
+                >
+                  {guardandoPaciente ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    'Continuar'
+                  )}
+                </button>
+              </div>
             </div>
           )}
         </div>
