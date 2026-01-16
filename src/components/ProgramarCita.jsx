@@ -316,15 +316,26 @@ const ProgramarCita = () => {
     if (!config) return [];
 
     const horas = [];
-    const [inicioH, inicioM] = config.hora_inicio.split(':').map(Number);
-    const [finH, finM] = config.hora_fin.split(':').map(Number);
+    // Usar horarios de agenda (no del sistema)
+    const horaInicio = config.hora_agenda_inicio || config.hora_inicio;
+    const horaFin = config.hora_agenda_fin || config.hora_fin;
+    
+    const [inicioH, inicioM] = horaInicio.split(':').map(Number);
+    const [finH, finM] = horaFin.split(':').map(Number);
     
     let hora = inicioH;
     let minuto = inicioM;
 
     while (hora < finH || (hora === finH && minuto <= finM)) {
-      const horaStr = `${hora.toString().padStart(2, '0')}:${minuto.toString().padStart(2, '0')}`;
-      horas.push(horaStr);
+      // Formato AM/PM
+      const periodo = hora >= 12 ? 'PM' : 'AM';
+      const hora12 = hora > 12 ? hora - 12 : (hora === 0 ? 12 : hora);
+      const horaFormateada = `${hora12}:${minuto.toString().padStart(2, '0')} ${periodo}`;
+      
+      horas.push({
+        valor: `${hora.toString().padStart(2, '0')}:${minuto.toString().padStart(2, '0')}`,
+        mostrar: horaFormateada
+      });
       
       minuto += 30;
       if (minuto >= 60) {
@@ -469,6 +480,14 @@ const ProgramarCita = () => {
     setCitaCreada(null);
     setError('');
     setPaso(1);
+  };
+
+  const formatearHora = (hora24) => {
+    if (!hora24) return '';
+    const [h, m] = hora24.split(':').map(Number);
+    const periodo = h >= 12 ? 'PM' : 'AM';
+    const hora12 = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+    return `${hora12}:${m.toString().padStart(2, '0')} ${periodo}`;
   };
 
   const formatearFecha = (fechaStr) => {
@@ -728,11 +747,11 @@ const ProgramarCita = () => {
               <div className="grid grid-cols-3 gap-2">
                 {getHorasDisponibles().map(hora => (
                   <button
-                    key={hora}
-                    onClick={() => seleccionarHora(hora)}
+                    key={hora.valor}
+                    onClick={() => seleccionarHora(hora.valor)}
                     className="p-3 border rounded-lg hover:bg-green-50 hover:border-green-300 transition text-center"
                   >
-                    {hora}
+                    {hora.mostrar}
                   </button>
                 ))}
               </div>
@@ -756,7 +775,7 @@ const ProgramarCita = () => {
                 <p><strong>Cédula:</strong> {pacienteSeleccionado?.cedula}</p>
                 <p><strong>Tratamiento:</strong> {tratamientoSeleccionado}</p>
                 <p><strong>Fecha:</strong> {formatearFecha(fechaSeleccionada)}</p>
-                <p><strong>Hora:</strong> {horaSeleccionada}</p>
+                <p><strong>Hora:</strong> {formatearHora(horaSeleccionada)}</p>
               </div>
 
               <div className="mb-4">
@@ -812,7 +831,7 @@ const ProgramarCita = () => {
                 <p><strong>Paciente:</strong> {pacienteSeleccionado?.primer_nombre} {pacienteSeleccionado?.primer_apellido}</p>
                 <p><strong>Tratamiento:</strong> {tratamientoSeleccionado}</p>
                 <p><strong>Fecha:</strong> {formatearFecha(fechaSeleccionada)}</p>
-                <p><strong>Hora:</strong> {horaSeleccionada}</p>
+                <p><strong>Hora:</strong> {formatearHora(horaSeleccionada)}</p>
               </div>
 
               <button
