@@ -34,8 +34,6 @@ const ProgramarCita = () => {
     celular: ''
   });
   const [guardandoPaciente, setGuardandoPaciente] = useState(false)
-
-  const [mostrarCalendario, setMostrarCalendario] = useState(false);
   const [mesActual, setMesActual] = useState(new Date());
   
   // Resultado
