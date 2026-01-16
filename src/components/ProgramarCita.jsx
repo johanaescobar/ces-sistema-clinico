@@ -34,6 +34,9 @@ const ProgramarCita = () => {
     celular: ''
   });
   const [guardandoPaciente, setGuardandoPaciente] = useState(false)
+
+  const [mostrarCalendario, setMostrarCalendario] = useState(false);
+  const [mesActual, setMesActual] = useState(new Date());
   
   // Resultado
   const [, setCitaCreada] = useState(null);
@@ -723,22 +726,104 @@ const ProgramarCita = () => {
                 Selecciona la fecha ({diaClinica})
               </h3>
 
-              <div 
-                className="w-full p-4 border rounded-lg hover:bg-green-50 hover:border-green-300 transition cursor-pointer flex items-center justify-between"
-                onClick={() => document.getElementById('selectorFecha').showPicker()}
-              >
-                <span className="text-gray-600">Seleccionar fecha</span>
-                <Calendar size={20} className="text-gray-400" />
-                <input
-                  id="selectorFecha"
-                  type="date"
-                  onChange={(e) => validarFecha(e.target.value)}
-                  className="absolute opacity-0 pointer-events-none"
-                  min={new Date().toISOString().split('T')[0]}
-                />
+              {/* Calendario personalizado */}
+              <div className="border rounded-lg p-4">
+                {/* Header del calendario */}
+                <div className="flex items-center justify-between mb-4">
+                  <button
+                    onClick={() => setMesActual(new Date(mesActual.getFullYear(), mesActual.getMonth() - 1))}
+                    className="p-2 hover:bg-gray-100 rounded-lg"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <span className="font-medium capitalize">
+                    {mesActual.toLocaleDateString('es-CO', { month: 'long', year: 'numeric' })}
+                  </span>
+                  <button
+                    onClick={() => setMesActual(new Date(mesActual.getFullYear(), mesActual.getMonth() + 1))}
+                    className="p-2 hover:bg-gray-100 rounded-lg"
+                  >
+                    <ChevronLeft size={20} className="rotate-180" />
+                  </button>
+                </div>
+
+                {/* Días de la semana */}
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'].map(dia => (
+                    <div key={dia} className="text-center text-sm font-medium text-gray-500 py-2">
+                      {dia}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Días del mes */}
+                <div className="grid grid-cols-7 gap-1">
+                  {(() => {
+                    const primerDia = new Date(mesActual.getFullYear(), mesActual.getMonth(), 1);
+                    const ultimoDia = new Date(mesActual.getFullYear(), mesActual.getMonth() + 1, 0);
+                    const diasPrevios = primerDia.getDay();
+                    const totalDias = ultimoDia.getDate();
+                    const hoy = new Date();
+                    hoy.setHours(0, 0, 0, 0);
+
+                    const dias = [];
+
+                    // Días vacíos al inicio
+                    for (let i = 0; i < diasPrevios; i++) {
+                      dias.push(<div key={`empty-${i}`} className="p-2" />);
+                    }
+
+                    // Días del mes
+                    for (let dia = 1; dia <= totalDias; dia++) {
+                      const fecha = new Date(mesActual.getFullYear(), mesActual.getMonth(), dia);
+                      const fechaStr = fecha.toISOString().split('T')[0];
+                      const diaSemana = fecha.getDay(); // 0=dom, 3=mié, 5=vie
+                      
+                      const esMiercoles = diaSemana === 3;
+                      const esViernes = diaSemana === 5;
+                      const esDiaPermitido = (diaClinica === 'miercoles' && esMiercoles) || (diaClinica === 'viernes' && esViernes);
+                      const esFestivo = festivos.includes(fechaStr);
+                      const esPasado = fecha < hoy;
+                      const esHabilitado = esDiaPermitido && !esFestivo && !esPasado;
+
+                      dias.push(
+                        <button
+                          key={dia}
+                          onClick={() => esHabilitado && validarFecha(fechaStr)}
+                          disabled={!esHabilitado}
+                          className={`p-2 text-center rounded-lg transition ${
+                            esHabilitado
+                              ? 'hover:bg-green-100 hover:text-green-700 cursor-pointer font-medium text-green-600'
+                              : 'text-gray-300 cursor-not-allowed'
+                          } ${esFestivo && esDiaPermitido ? 'line-through text-red-300' : ''}`}
+                        >
+                          {dia}
+                        </button>
+                      );
+                    }
+
+                    return dias;
+                  })()}
+                </div>
+
+                {/* Leyenda */}
+                <div className="mt-4 pt-3 border-t flex gap-4 text-xs text-gray-500">
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded bg-green-100 border border-green-300"></div>
+                    <span>Disponible</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded bg-gray-100"></div>
+                    <span>No disponible</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="w-3 h-3 rounded bg-red-100 border border-red-200"></div>
+                    <span>Festivo</span>
+                  </div>
+                </div>
               </div>
 
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-gray-500 mt-3">
                 Solo se permite agendar citas en días habilitados para la clínica.
               </p>
 
