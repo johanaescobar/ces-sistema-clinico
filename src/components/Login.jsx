@@ -106,6 +106,14 @@ const Login = ({ onLoginSuccess }) => {
         
         if (Array.isArray(usuarios) && usuarios.length > 0) {
           const usuarioDB = usuarios[0];
+          
+          // Verificar si el usuario está activo
+          if (!usuarioDB.activo) {
+            setError('Tu cuenta está deshabilitada. Contacta a la Dra. Escobar.');
+            setLoading(false);
+            return;
+          }
+          
           sessionStorage.setItem('token', 'dev-token-' + Date.now());
           sessionStorage.setItem('usuario', JSON.stringify(usuarioDB));
           sessionStorage.setItem('ultimaActividad', Date.now().toString());
