@@ -45,7 +45,7 @@ const ProgramarCita = () => {
     'Rehabilitación PPF',
     'Rehabilitación PPR',
     'Rehabilitación PT'
-  ];;
+  ];
 
   useEffect(() => {
     verificarAccesoYCargarDatos();
