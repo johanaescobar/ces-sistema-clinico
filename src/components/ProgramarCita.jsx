@@ -550,6 +550,58 @@ const ProgramarCita = () => {
     });
   };
 
+  // Componente para mostrar citas del día
+  const CitasDelDia = ({ fechaSeleccionada, usuario, formatearHora }) => {
+    const [citasDelDia, setCitasDelDia] = useState([]);
+    const [cargandoCitas, setCargandoCitas] = useState(true);
+
+    useEffect(() => {
+      const cargarCitas = async () => {
+        try {
+          const res = await fetch(
+            `${SUPABASE_CONFIG.URL}/rest/v1/citas?estudiante_id=eq.${usuario.id}&fecha_cita=eq.${fechaSeleccionada}&estado=neq.cancelada&select=*,pacientes(primer_nombre,primer_apellido)`,
+            {
+              headers: {
+                'apikey': SUPABASE_CONFIG.ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+              }
+            }
+          );
+          const data = await res.json();
+          setCitasDelDia(Array.isArray(data) ? data : []);
+        } catch (err) {
+          console.error('Error cargando citas:', err);
+        } finally {
+          setCargandoCitas(false);
+        }
+      };
+      cargarCitas();
+    }, [fechaSeleccionada, usuario.id]);
+
+    if (cargandoCitas) return null;
+    if (citasDelDia.length === 0) return null;
+
+    return (
+      <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+        <p className="text-sm font-medium text-yellow-800 mb-2">
+          Ya tienes {citasDelDia.length} cita{citasDelDia.length > 1 ? 's' : ''} este día:
+        </p>
+        <div className="space-y-1">
+          {citasDelDia.map(cita => (
+            <div key={cita.id} className="text-sm text-yellow-700">
+              • {formatearHora(cita.hora)} - {cita.pacientes?.primer_nombre} {cita.pacientes?.primer_apellido} ({cita.tratamiento_programado})
+            </div>
+          ))}
+        </div>
+        {citasDelDia.length >= 2 && (
+          <p className="text-xs text-red-600 mt-2 font-medium">
+            ⚠️ Máximo 2 citas por día alcanzado
+          </p>
+        )}
+      </div>
+    );
+  };
+
   // PANTALLA DE CARGA INICIAL
   if (cargando) {
     return (
@@ -894,6 +946,9 @@ const ProgramarCita = () => {
               <p className="text-sm text-gray-600 mb-3">
                 {formatearFecha(fechaSeleccionada)}
               </p>
+
+              {/* Mostrar citas ya agendadas este día */}
+              <CitasDelDia fechaSeleccionada={fechaSeleccionada} usuario={usuario} formatearHora={formatearHora} />
 
               <div className="grid grid-cols-3 gap-2">
                 {getHorasDisponibles().map(hora => (
