@@ -552,7 +552,9 @@ const ProgramarCita = () => {
           </div>
         )}
 
-        {/* PASO 1: Seleccionar paciente */}
+        {/* Contenido según paso */}
+        <div className="p-6">
+          {/* PASO 1: Seleccionar paciente */}
           {paso === 1 && (
             <div>
               <h3 className="font-semibold text-gray-800 mb-4 flex items-center gap-2">
