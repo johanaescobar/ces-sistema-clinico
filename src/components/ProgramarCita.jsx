@@ -355,7 +355,7 @@ const ProgramarCita = () => {
             paciente_id: pacienteSeleccionado.id,
             estudiante_id: usuario.id,
             fecha_cita: fechaSeleccionada,
-            dia_clinica: diaClinica,
+            dia_clinica: diaClinica === 'miercoles' ? 'Miercoles pm' : 'Viernes am',
             hora: horaSeleccionada,
             tratamiento_programado: tratamientoSeleccionado,
             observacion: observacion.trim(),
