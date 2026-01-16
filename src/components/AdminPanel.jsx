@@ -243,14 +243,57 @@ const GestionPacientes = () => {
 
   const cambiarEstudiante = async (pacienteId, nuevoEstudianteId) => {
   try {
-    // 1. Reasignar paciente
+    // 1. Si no hay nuevo estudiante, solo desasignar
+    if (!nuevoEstudianteId) {
+      await supabaseFetch(`pacientes?id=eq.${pacienteId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estudiante_actual_id: null })
+      });
+      cargar();
+      return;
+    }
+
+    // 2. Verificar citas programadas del paciente
+    const citasPaciente = await supabaseFetch(
+      `citas?paciente_id=eq.${pacienteId}&estado=eq.programada&select=id,fecha_cita,hora`
+    );
+
+    // 3. Si hay citas, verificar conflictos con el nuevo estudiante
+    if (citasPaciente && citasPaciente.length > 0) {
+      const conflictos = [];
+      
+      for (const cita of citasPaciente) {
+        // Contar citas del nuevo estudiante en ese día
+        const citasNuevoEst = await supabaseFetch(
+          `citas?estudiante_id=eq.${nuevoEstudianteId}&fecha_cita=eq.${cita.fecha_cita}&estado=eq.programada&select=id`
+        );
+        
+        if (citasNuevoEst && citasNuevoEst.length >= 2) {
+          conflictos.push(`${cita.fecha_cita}: ya tiene 2 citas`);
+        }
+      }
+
+      // Mostrar advertencia si hay conflictos
+      if (conflictos.length > 0) {
+        const nuevoEst = estudiantes.find(e => e.id === nuevoEstudianteId);
+        const confirmar = window.confirm(
+          `⚠️ ${nuevoEst?.nombre_completo || 'El estudiante'} tiene conflictos:\n\n` +
+          conflictos.join('\n') + 
+          `\n\n¿Reasignar de todas formas?`
+        );
+        
+        if (!confirmar) return;
+      }
+    }
+
+    // 4. Reasignar paciente
     await supabaseFetch(`pacientes?id=eq.${pacienteId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ estudiante_actual_id: nuevoEstudianteId || null })
+      body: JSON.stringify({ estudiante_actual_id: nuevoEstudianteId })
     });
 
-    // 2. Reasignar citas programadas de ese paciente al nuevo estudiante
-    if (nuevoEstudianteId) {
+    // 5. Reasignar citas programadas
+    if (citasPaciente && citasPaciente.length > 0) {
       await supabaseFetch(`citas?paciente_id=eq.${pacienteId}&estado=eq.programada`, {
         method: 'PATCH',
         body: JSON.stringify({ estudiante_id: nuevoEstudianteId })
