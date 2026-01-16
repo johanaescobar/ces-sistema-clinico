@@ -26,7 +26,7 @@ const ProgramarCita = () => {
   const [observacion, setObservacion] = useState('');
   
   // Resultado
-  const [citaCreada, setCitaCreada] = useState(null);
+  const [, setCitaCreada] = useState(null);
   const [enviando, setEnviando] = useState(false);
 
   const usuario = JSON.parse(sessionStorage.getItem('usuario') || '{}');
@@ -49,7 +49,7 @@ const ProgramarCita = () => {
 
   useEffect(() => {
     verificarAccesoYCargarDatos();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const verificarAccesoYCargarDatos = async () => {
     try {

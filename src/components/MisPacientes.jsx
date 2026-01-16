@@ -1,6 +1,6 @@
 // src/components/MisPacientes.jsx
 import React, { useState, useEffect } from 'react';
-import { Users, Eye, Edit, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle, X, Calendar, Clock } from 'lucide-react';
+import { Users, Edit, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle, X, Calendar, Clock } from 'lucide-react';
 import { SUPABASE_CONFIG } from '../config/api';
 
 const MisPacientes = () => {
@@ -18,7 +18,7 @@ const MisPacientes = () => {
 
   useEffect(() => {
     cargarPacientes();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cargarPacientes = async () => {
     try {

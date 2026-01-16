@@ -1,6 +1,6 @@
 // src/components/Login.jsx
 import React, { useState, useEffect } from 'react';
-import { Lock, Mail } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import { API_ENDPOINTS } from '../config/api';
 
 // ============================================================

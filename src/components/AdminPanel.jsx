@@ -385,7 +385,7 @@ const GestionFestivos = () => {
     }
   };
 
-  useEffect(() => { cargar(); }, [filtroAnio]);
+  useEffect(() => { cargar(); }, [filtroAnio]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const guardar = async () => {
     if (!form.fecha || !form.nombre) {
