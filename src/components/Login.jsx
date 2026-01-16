@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail } from 'lucide-react';
 import { API_ENDPOINTS } from '../config/api';
+import { SUPABASE_CONFIG } from '../config/api';
 
 // ============================================================
 // MODO DESARROLLO: true = sin validación WAB, false = producción con WAB
@@ -92,14 +93,14 @@ const Login = ({ onLoginSuccess }) => {
       // Buscar usuario real en Supabase para obtener el ID
       try {
         const res = await fetch(
-          `https://jblnwabxquqacnlpvkfs.supabase.co/rest/v1/usuarios?correo=eq.${correo.toLowerCase()}&select=*`,
-          {
-            headers: {
-              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpibG53YWJ4cXVxYWNubHB2a2ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MDkwNjUsImV4cCI6MjA1MjM4NTA2NX0.GDwrA4vyLkrJpFUXnfKjQKFEFfCMzLS4MQVHYkuBBQo',
-              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpibG53YWJ4cXVxYWNubHB2a2ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MDkwNjUsImV4cCI6MjA1MjM4NTA2NX0.GDwrA4vyLkrJpFUXnfKjQKFEFfCMzLS4MQVHYkuBBQo'
-            }
+        `${SUPABASE_CONFIG.URL}/rest/v1/usuarios?correo=eq.${correo.toLowerCase()}&select=*`,
+        {
+          headers: {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
           }
-        );
+        }
+      );
         const usuarios = await res.json();
         
         if (Array.isArray(usuarios) && usuarios.length > 0) {
