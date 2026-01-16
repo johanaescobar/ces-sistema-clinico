@@ -369,7 +369,35 @@ const ProgramarCita = () => {
     return horas;
   };
 
-  const seleccionarHora = (hora) => {
+  const seleccionarHora = async (hora) => {
+    setError('');
+    
+    // Verificar traslape con citas existentes
+    try {
+      const resCitas = await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/citas?estudiante_id=eq.${usuario.id}&fecha_cita=eq.${fechaSeleccionada}&estado=neq.cancelada`,
+        {
+          headers: {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+          }
+        }
+      );
+      const citasDelDia = await resCitas.json();
+      
+      if (Array.isArray(citasDelDia) && citasDelDia.length > 0) {
+        // Verificar si ya existe una cita a la misma hora
+        const citaMismaHora = citasDelDia.find(cita => cita.hora.slice(0,5) === hora.slice(0,5));
+        
+        if (citaMismaHora) {
+          setError(`Ya tienes una cita a las ${formatearHora(hora)}. Selecciona otra hora.`);
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Error verificando traslape:', err);
+    }
+
     setHoraSeleccionada(hora);
     setPaso(6);
   };
