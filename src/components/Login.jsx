@@ -10,7 +10,8 @@ import { SUPABASE_CONFIG } from '../config/api';
 const MODO_DEV = true;
 const CODIGOS_DEV = {
   'jescobarp@ces.edu.co': '111111',  // Johana
-  'jgaitan@uces.edu.co': '222222'    // Prueba
+  'jgaitan@uces.edu.co': '222222',   // Prueba
+  'temporal@uces.edu.co': '333333'   // Temporal
 };
 // ============================================================
 
