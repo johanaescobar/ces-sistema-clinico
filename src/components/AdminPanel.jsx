@@ -58,7 +58,161 @@ const GestionEstudiantes = () => {
     }
   };
 
-  // =============================================
+  useEffect(() => { cargar(); }, []);
+
+  const guardar = async () => {
+    if (!form.nombre_completo || !form.correo || !form.celular) {
+      setError('Todos los campos son requeridos');
+      return;
+    }
+    if (!form.correo.endsWith('@uces.edu.co')) {
+      setError('El correo debe ser @uces.edu.co');
+      return;
+    }
+
+    try {
+      if (editando) {
+        await supabaseFetch(`usuarios?id=eq.${editando}`, {
+          method: 'PATCH',
+          body: JSON.stringify(form)
+        });
+      } else {
+        await supabaseFetch('usuarios', {
+          method: 'POST',
+          body: JSON.stringify({ ...form, rol: 'estudiante', activo: true })
+        });
+      }
+      setEditando(null);
+      setNuevo(false);
+      setForm({ nombre_completo: '', correo: '', celular: '' });
+      setError('');
+      cargar();
+    } catch (err) {
+      setError('Error al guardar');
+    }
+  };
+
+  const toggleActivo = async (id, activo) => {
+    try {
+      await supabaseFetch(`usuarios?id=eq.${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ activo: !activo })
+      });
+      cargar();
+    } catch (err) {
+      setError('Error al actualizar');
+    }
+  };
+
+  const eliminar = async (id) => {
+    if (!window.confirm('¿Eliminar este estudiante?')) return;
+    try {
+      await supabaseFetch(`usuarios?id=eq.${id}`, { method: 'DELETE' });
+      cargar();
+    } catch (err) {
+      setError('Error al eliminar');
+    }
+  };
+
+  if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-lg font-bold">Estudiantes ({estudiantes.length})</h3>
+        <button
+          onClick={() => { setNuevo(true); setForm({ nombre_completo: '', correo: '', celular: '' }); }}
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+        >
+          <UserPlus size={20} /> Agregar
+        </button>
+      </div>
+
+      {error && (
+        <div className="bg-red-100 text-red-700 px-4 py-2 rounded-lg mb-4">{error}</div>
+      )}
+
+      {(nuevo || editando) && (
+        <div className="bg-gray-50 p-4 rounded-lg mb-4 border">
+          <h4 className="font-bold mb-3">{editando ? 'Editar' : 'Nuevo'} Estudiante</h4>
+          <div className="grid gap-3 md:grid-cols-3">
+            <input
+              placeholder="Nombre completo"
+              value={form.nombre_completo}
+              onChange={(e) => setForm({ ...form, nombre_completo: e.target.value })}
+              className="border rounded-lg px-3 py-2"
+            />
+            <input
+              placeholder="correo@uces.edu.co"
+              value={form.correo}
+              onChange={(e) => setForm({ ...form, correo: e.target.value })}
+              className="border rounded-lg px-3 py-2"
+              disabled={!!editando}
+            />
+            <input
+              placeholder="Celular (3001234567)"
+              value={form.celular}
+              onChange={(e) => setForm({ ...form, celular: e.target.value.replace(/\D/g, '') })}
+              className="border rounded-lg px-3 py-2"
+            />
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button onClick={guardar} className="flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+              <Save size={16} /> Guardar
+            </button>
+            <button onClick={() => { setNuevo(false); setEditando(null); setError(''); }} className="flex items-center gap-1 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
+              <X size={16} /> Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="text-left p-3 font-semibold">Nombre</th>
+              <th className="text-left p-3 font-semibold">Correo</th>
+              <th className="text-left p-3 font-semibold">Celular</th>
+              <th className="text-center p-3 font-semibold">Estado</th>
+              <th className="text-center p-3 font-semibold">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {estudiantes.map((e) => (
+              <tr key={e.id} className="border-b hover:bg-gray-50">
+                <td className="p-3">{e.nombre_completo}</td>
+                <td className="p-3 text-sm text-gray-600">{e.correo}</td>
+                <td className="p-3">{e.celular}</td>
+                <td className="p-3 text-center">
+                  <button
+                    onClick={() => toggleActivo(e.id, e.activo)}
+                    className={`px-2 py-1 rounded text-xs font-medium ${e.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
+                  >
+                    {e.activo ? 'Activo' : 'Inactivo'}
+                  </button>
+                </td>
+                <td className="p-3 text-center">
+                  <button
+                    onClick={() => { setEditando(e.id); setForm({ nombre_completo: e.nombre_completo, correo: e.correo, celular: e.celular }); }}
+                    className="text-blue-600 hover:text-blue-800 mx-1"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                  <button onClick={() => eliminar(e.id)} className="text-red-600 hover:text-red-800 mx-1">
+                    <Trash2 size={18} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+// =============================================
 // COMPONENTE: GESTIÓN DE PACIENTES
 // =============================================
 const GestionPacientes = () => {
@@ -329,163 +483,6 @@ const GestionCitas = () => {
   );
 };
 
-  useEffect(() => { cargar(); }, []);
-
-  const guardar = async () => {
-    if (!form.nombre_completo || !form.correo || !form.celular) {
-      setError('Todos los campos son requeridos');
-      return;
-    }
-    if (!form.correo.endsWith('@uces.edu.co')) {
-      setError('El correo debe ser @uces.edu.co');
-      return;
-    }
-
-    try {
-      if (editando) {
-        await supabaseFetch(`usuarios?id=eq.${editando}`, {
-          method: 'PATCH',
-          body: JSON.stringify(form)
-        });
-      } else {
-        await supabaseFetch('usuarios', {
-          method: 'POST',
-          body: JSON.stringify({ ...form, rol: 'estudiante', activo: true })
-        });
-      }
-      setEditando(null);
-      setNuevo(false);
-      setForm({ nombre_completo: '', correo: '', celular: '' });
-      setError('');
-      cargar();
-    } catch (err) {
-      setError('Error al guardar');
-    }
-  };
-
-  const toggleActivo = async (id, activo) => {
-    try {
-      await supabaseFetch(`usuarios?id=eq.${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ activo: !activo })
-      });
-      cargar();
-    } catch (err) {
-      setError('Error al actualizar');
-    }
-  };
-
-  const eliminar = async (id) => {
-    if (!window.confirm('¿Eliminar este estudiante?')) return;
-    try {
-      await supabaseFetch(`usuarios?id=eq.${id}`, { method: 'DELETE' });
-      cargar();
-    } catch (err) {
-      setError('Error al eliminar');
-    }
-  };
-
-  if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
-
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-bold">Estudiantes ({estudiantes.length})</h3>
-        <button
-          onClick={() => { setNuevo(true); setForm({ nombre_completo: '', correo: '', celular: '' }); }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-        >
-          <UserPlus size={20} /> Agregar
-        </button>
-      </div>
-
-      {error && (
-        <div className="bg-red-100 text-red-700 px-4 py-2 rounded-lg mb-4">{error}</div>
-      )}
-
-      {(nuevo || editando) && (
-        <div className="bg-gray-50 p-4 rounded-lg mb-4 border">
-          <h4 className="font-bold mb-3">{editando ? 'Editar' : 'Nuevo'} Estudiante</h4>
-          <div className="grid gap-3 md:grid-cols-3">
-            <input
-              placeholder="Nombre completo"
-              value={form.nombre_completo}
-              onChange={(e) => setForm({ ...form, nombre_completo: e.target.value })}
-              className="border rounded-lg px-3 py-2"
-            />
-            <input
-              placeholder="correo@uces.edu.co"
-              value={form.correo}
-              onChange={(e) => setForm({ ...form, correo: e.target.value })}
-              className="border rounded-lg px-3 py-2"
-              disabled={!!editando}
-            />
-            <input
-              placeholder="Celular (3001234567)"
-              value={form.celular}
-              onChange={(e) => setForm({ ...form, celular: e.target.value.replace(/\D/g, '') })}
-              className="border rounded-lg px-3 py-2"
-            />
-          </div>
-          <div className="flex gap-2 mt-3">
-            <button onClick={guardar} className="flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-              <Save size={16} /> Guardar
-            </button>
-            <button onClick={() => { setNuevo(false); setEditando(null); setError(''); }} className="flex items-center gap-1 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
-              <X size={16} /> Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="text-left p-3 font-semibold">Nombre</th>
-              <th className="text-left p-3 font-semibold">Correo</th>
-              <th className="text-left p-3 font-semibold">Celular</th>
-              <th className="text-center p-3 font-semibold">Estado</th>
-              <th className="text-center p-3 font-semibold">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {estudiantes.map((e) => (
-              <tr key={e.id} className="border-b hover:bg-gray-50">
-                <td className="p-3">{e.nombre_completo}</td>
-                <td className="p-3 text-sm text-gray-600">{e.correo}</td>
-                <td className="p-3">{e.celular}</td>
-                <td className="p-3 text-center">
-                  <button
-                    onClick={() => toggleActivo(e.id, e.activo)}
-                    className={`px-2 py-1 rounded text-xs font-medium ${e.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
-                  >
-                    {e.activo ? 'Activo' : 'Inactivo'}
-                  </button>
-                </td>
-                <td className="p-3 text-center">
-                  <button
-                    onClick={() => { setEditando(e.id); setForm({ nombre_completo: e.nombre_completo, correo: e.correo, celular: e.celular }); }}
-                    className="text-blue-600 hover:text-blue-800 mx-1"
-                  >
-                    <Edit2 size={18} />
-                  </button>
-                  <button onClick={() => eliminar(e.id)} className="text-red-600 hover:text-red-800 mx-1">
-                    <Trash2 size={18} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {estudiantes.length === 0 && (
-          <p className="text-center text-gray-500 py-8">No hay estudiantes registrados</p>
-        )}
-      </div>
-    </div>
-  );
-};
-
 // =============================================
 // COMPONENTE: GESTIÓN DE HORARIOS
 // =============================================
@@ -493,8 +490,7 @@ const GestionHorarios = () => {
   const [horarios, setHorarios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [editando, setEditando] = useState(null);
-  const [nuevo, setNuevo] = useState(false);
-  const [form, setForm] = useState({ dia_semana: 'miercoles', hora_inicio: '13:00', hora_fin: '19:00' });
+  const [form, setForm] = useState({});
 
   const cargar = async () => {
     setCargando(true);
@@ -512,125 +508,98 @@ const GestionHorarios = () => {
 
   const guardar = async () => {
     try {
-      if (editando) {
-        await supabaseFetch(`config_horarios?id=eq.${editando}`, {
-          method: 'PATCH',
-          body: JSON.stringify(form)
-        });
-      } else {
-        await supabaseFetch('config_horarios', {
-          method: 'POST',
-          body: JSON.stringify({ ...form, activo: true })
-        });
-      }
+      await supabaseFetch(`config_horarios?id=eq.${editando}`, {
+        method: 'PATCH',
+        body: JSON.stringify(form)
+      });
       setEditando(null);
-      setNuevo(false);
       cargar();
     } catch (err) {
       alert('Error al guardar');
     }
   };
 
-  const eliminar = async (id) => {
-    if (!window.confirm('¿Eliminar este horario?')) return;
+  const toggleActivo = async (id, activo) => {
     try {
-      await supabaseFetch(`config_horarios?id=eq.${id}`, { method: 'DELETE' });
+      await supabaseFetch(`config_horarios?id=eq.${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ activo: !activo })
+      });
       cargar();
     } catch (err) {
-      alert('Error al eliminar');
+      console.error(err);
     }
   };
-
-  const diasMap = { miercoles: 'Miércoles', viernes: 'Viernes', lunes: 'Lunes', martes: 'Martes', jueves: 'Jueves', sabado: 'Sábado' };
 
   if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-bold">Horarios de Clínica</h3>
-        <button
-          onClick={() => { setNuevo(true); setForm({ dia_semana: 'miercoles', hora_inicio: '13:00', hora_fin: '19:00' }); }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-        >
-          <Plus size={20} /> Agregar
-        </button>
-      </div>
+      <h3 className="text-lg font-bold mb-6">Configuración de Horarios</h3>
 
-      {(nuevo || editando) && (
-        <div className="bg-gray-50 p-4 rounded-lg mb-4 border">
-          <h4 className="font-bold mb-3">{editando ? 'Editar' : 'Nuevo'} Horario</h4>
-          <div className="grid gap-3 md:grid-cols-3">
-            <select
-              value={form.dia_semana}
-              onChange={(e) => setForm({ ...form, dia_semana: e.target.value })}
-              className="border rounded-lg px-3 py-2"
-            >
-              <option value="lunes">Lunes</option>
-              <option value="martes">Martes</option>
-              <option value="miercoles">Miércoles</option>
-              <option value="jueves">Jueves</option>
-              <option value="viernes">Viernes</option>
-              <option value="sabado">Sábado</option>
-            </select>
-            <input
-              type="time"
-              value={form.hora_inicio}
-              onChange={(e) => setForm({ ...form, hora_inicio: e.target.value })}
-              className="border rounded-lg px-3 py-2"
-            />
-            <input
-              type="time"
-              value={form.hora_fin}
-              onChange={(e) => setForm({ ...form, hora_fin: e.target.value })}
-              className="border rounded-lg px-3 py-2"
-            />
-          </div>
-          <div className="flex gap-2 mt-3">
-            <button onClick={guardar} className="flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-              <Save size={16} /> Guardar
-            </button>
-            <button onClick={() => { setNuevo(false); setEditando(null); }} className="flex items-center gap-1 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
-              <X size={16} /> Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="space-y-4">
         {horarios.map((h) => (
-          <div key={h.id} className={`p-4 rounded-lg border-2 ${h.activo ? 'border-green-300 bg-green-50' : 'border-gray-300 bg-gray-50'}`}>
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="font-bold text-lg">{diasMap[h.dia_semana] || h.dia_semana}</h4>
-                <p className="text-2xl font-mono mt-1">
-                  {h.hora_inicio?.slice(0, 5)} - {h.hora_fin?.slice(0, 5)}
-                </p>
+          <div key={h.id} className={`p-4 border rounded-lg ${h.activo ? 'bg-white' : 'bg-gray-100'}`}>
+            {editando === h.id ? (
+              <div className="space-y-3">
+                <div className="flex items-center gap-4">
+                  <span className="font-bold capitalize w-24">{h.dia_semana}</span>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="text-sm text-gray-600">Hora inicio sistema</label>
+                    <input
+                      type="time"
+                      value={form.hora_inicio || ''}
+                      onChange={(e) => setForm({ ...form, hora_inicio: e.target.value })}
+                      className="w-full border rounded px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Hora fin sistema</label>
+                    <input
+                      type="time"
+                      value={form.hora_fin || ''}
+                      onChange={(e) => setForm({ ...form, hora_fin: e.target.value })}
+                      className="w-full border rounded px-3 py-2"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={guardar} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                    <Save size={16} />
+                  </button>
+                  <button onClick={() => setEditando(null)} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setEditando(h.id); setForm({ dia_semana: h.dia_semana, hora_inicio: h.hora_inicio?.slice(0, 5), hora_fin: h.hora_fin?.slice(0, 5) }); }}
-                  className="text-blue-600 hover:text-blue-800"
-                >
-                  <Edit2 size={18} />
-                </button>
-                <button onClick={() => eliminar(h.id)} className="text-red-600 hover:text-red-800">
-                  <Trash2 size={18} />
-                </button>
+            ) : (
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="font-bold capitalize">{h.dia_semana}</span>
+                  <span className="text-gray-600 ml-4">
+                    {h.hora_inicio?.slice(0, 5)} - {h.hora_fin?.slice(0, 5)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => toggleActivo(h.id, h.activo)}
+                    className={`px-3 py-1 rounded text-sm ${h.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
+                  >
+                    {h.activo ? 'Activo' : 'Inactivo'}
+                  </button>
+                  <button
+                    onClick={() => { setEditando(h.id); setForm(h); }}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         ))}
-      </div>
-      {horarios.length === 0 && (
-        <p className="text-center text-gray-500 py-8">No hay horarios configurados</p>
-      )}
-
-      <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-        <p className="text-sm text-yellow-800">
-          <strong>⚠️ Nota:</strong> Los cambios de horarios afectan el workflow de autenticación en n8n. 
-          Si agregas nuevos días, debes actualizar también el código de validación en n8n.
-        </p>
       </div>
     </div>
   );
@@ -642,9 +611,8 @@ const GestionHorarios = () => {
 const GestionFestivos = () => {
   const [festivos, setFestivos] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [nuevo, setNuevo] = useState(false);
-  const [form, setForm] = useState({ fecha: '', nombre: '', anio: new Date().getFullYear() });
   const [filtroAnio, setFiltroAnio] = useState(new Date().getFullYear());
+  const [form, setForm] = useState({ fecha: '', nombre: '' });
 
   const cargar = async () => {
     setCargando(true);
@@ -671,11 +639,10 @@ const GestionFestivos = () => {
         method: 'POST',
         body: JSON.stringify({ ...form, anio })
       });
-      setNuevo(false);
-      setForm({ fecha: '', nombre: '', anio: new Date().getFullYear() });
+      setForm({ fecha: '', nombre: '' });
       cargar();
     } catch (err) {
-      alert('Error al guardar (¿fecha duplicada?)');
+      alert('Error al guardar');
     }
   };
 
@@ -694,62 +661,48 @@ const GestionFestivos = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center gap-4">
-          <h3 className="text-lg font-bold">Festivos Colombia</h3>
-          <select
-            value={filtroAnio}
-            onChange={(e) => setFiltroAnio(Number(e.target.value))}
-            className="border rounded-lg px-3 py-1"
-          >
-            <option value={2025}>2025</option>
-            <option value={2026}>2026</option>
-            <option value={2027}>2027</option>
-          </select>
-        </div>
-        <button
-          onClick={() => { setNuevo(true); setForm({ fecha: '', nombre: '', anio: filtroAnio }); }}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+        <h3 className="text-lg font-bold">Festivos Colombia</h3>
+        <select
+          value={filtroAnio}
+          onChange={(e) => setFiltroAnio(Number(e.target.value))}
+          className="border rounded-lg px-4 py-2"
         >
-          <Plus size={20} /> Agregar
-        </button>
+          {[2025, 2026, 2027, 2028, 2029, 2030].map(a => (
+            <option key={a} value={a}>{a}</option>
+          ))}
+        </select>
       </div>
 
-      {nuevo && (
-        <div className="bg-gray-50 p-4 rounded-lg mb-4 border">
-          <h4 className="font-bold mb-3">Nuevo Festivo</h4>
-          <div className="grid gap-3 md:grid-cols-2">
-            <input
-              type="date"
-              value={form.fecha}
-              onChange={(e) => setForm({ ...form, fecha: e.target.value })}
-              className="border rounded-lg px-3 py-2"
-            />
-            <input
-              placeholder="Nombre del festivo"
-              value={form.nombre}
-              onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-              className="border rounded-lg px-3 py-2"
-            />
-          </div>
-          <div className="flex gap-2 mt-3">
-            <button onClick={guardar} className="flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-              <Save size={16} /> Guardar
-            </button>
-            <button onClick={() => setNuevo(false)} className="flex items-center gap-1 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
-              <X size={16} /> Cancelar
-            </button>
-          </div>
+      <div className="bg-gray-50 p-4 rounded-lg mb-6 border">
+        <h4 className="font-bold mb-3">Agregar festivo</h4>
+        <div className="flex gap-3 flex-wrap">
+          <input
+            type="date"
+            value={form.fecha}
+            onChange={(e) => setForm({ ...form, fecha: e.target.value })}
+            className="border rounded-lg px-3 py-2"
+          />
+          <input
+            type="text"
+            placeholder="Nombre del festivo"
+            value={form.nombre}
+            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+            className="border rounded-lg px-3 py-2 flex-1"
+          />
+          <button onClick={guardar} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+            <Plus size={20} />
+          </button>
         </div>
-      )}
+      </div>
 
-      <div className="grid gap-2">
+      <div className="space-y-2">
         {festivos.map((f) => (
-          <div key={f.id} className="flex items-center justify-between p-3 bg-white border rounded-lg hover:bg-gray-50">
-            <div className="flex items-center gap-4">
-              <div className="bg-red-100 text-red-700 px-3 py-1 rounded font-mono text-sm">
-                {f.fecha}
-              </div>
-              <span>{f.nombre}</span>
+          <div key={f.id} className="flex justify-between items-center p-3 bg-white border rounded-lg">
+            <div>
+              <span className="font-medium">{f.nombre}</span>
+              <span className="text-gray-500 ml-3 text-sm">
+                {new Date(f.fecha + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </span>
             </div>
             <button onClick={() => eliminar(f.id)} className="text-red-600 hover:text-red-800">
               <Trash2 size={18} />
@@ -757,15 +710,18 @@ const GestionFestivos = () => {
           </div>
         ))}
       </div>
+
       {festivos.length === 0 && (
-        <p className="text-center text-gray-500 py-8">No hay festivos para {filtroAnio}</p>
+        <div className="text-center py-8 text-gray-500">
+          No hay festivos registrados para {filtroAnio}
+        </div>
       )}
     </div>
   );
 };
 
 // =============================================
-// COMPONENTE: LOGS DE ERRORES
+// COMPONENTE: GESTIÓN DE LOGS
 // =============================================
 const GestionLogs = () => {
   const [logs, setLogs] = useState([]);
@@ -792,30 +748,30 @@ const GestionLogs = () => {
   useEffect(() => { cargar(); }, []);
 
   const formatFecha = (fecha) => {
-    if (!fecha) return '-';
-    return new Date(fecha).toLocaleString('es-CO');
+    return new Date(fecha).toLocaleString('es-CO', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
   };
 
   if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setTab('errores')}
-            className={`px-4 py-2 rounded-lg ${tab === 'errores' ? 'bg-red-600 text-white' : 'bg-gray-200'}`}
-          >
-            Errores ({logs.length})
-          </button>
-          <button
-            onClick={() => setTab('accesos')}
-            className={`px-4 py-2 rounded-lg ${tab === 'accesos' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-          >
-            Accesos ({accesos.length})
-          </button>
-        </div>
-        <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
+      <div className="flex gap-4 mb-6">
+        <button
+          onClick={() => setTab('errores')}
+          className={`px-4 py-2 rounded-lg ${tab === 'errores' ? 'bg-red-100 text-red-700' : 'bg-gray-100'}`}
+        >
+          Errores ({logs.length})
+        </button>
+        <button
+          onClick={() => setTab('accesos')}
+          className={`px-4 py-2 rounded-lg ${tab === 'accesos' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`}
+        >
+          Accesos ({accesos.length})
+        </button>
+        <button onClick={cargar} className="ml-auto flex items-center gap-2 text-gray-600 hover:text-gray-800">
           <RefreshCw size={20} /> Actualizar
         </button>
       </div>
@@ -997,7 +953,6 @@ const GestionConfig = () => {
     setGuardando(true);
     setMensaje('');
     try {
-      // Verificar si existe registro
       const existe = await supabaseFetch('config_sistema?select=id');
       
       if (existe && existe.length > 0) {
