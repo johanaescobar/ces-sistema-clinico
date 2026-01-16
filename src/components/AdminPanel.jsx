@@ -1,7 +1,7 @@
 // src/components/AdminPanel.jsx
 import React, { useState, useEffect } from 'react';
 import { 
-  Users, Clock, Calendar, BarChart3, 
+  Users, Clock, Calendar, AlertTriangle, BarChart3, 
   Plus, Trash2, Edit2, Save, X, RefreshCw, Loader2,
   CheckCircle, XCircle, UserPlus, Settings
 } from 'lucide-react';
