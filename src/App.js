@@ -88,7 +88,7 @@ const Inicio = ({ usuario }) => {
 
             {/* Mis próximas citas */}
             <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
-              <h3 className="font-bold text-green-800 mb-3">📅 Mis próximas citas</h3>
+              <h3 className="font-bold text-green-800 mb-3">📅 Mis próximas citas agendadas</h3>
               {cargandoCitas ? (
                 <p className="text-sm text-gray-500">Cargando...</p>
               ) : citasProximas.length === 0 ? (

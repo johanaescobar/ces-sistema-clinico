@@ -84,7 +84,37 @@ const Login = ({ onLoginSuccess }) => {
     }
 
     // === MODO DESARROLLO ===
+    if (MODO_DEV && CODIGOS_DEV[correo.toLowerCase()] && CODIGOS_DEV[correo.toLowerCase()] !== codigo) {
+      setError('Código incorrecto. Usa: ' + CODIGOS_DEV[correo.toLowerCase()]);
+      return;
+    }
     if (MODO_DEV && CODIGOS_DEV[correo.toLowerCase()] === codigo) {
+      // Buscar usuario real en Supabase para obtener el ID
+      try {
+        const res = await fetch(
+          `https://jblnwabxquqacnlpvkfs.supabase.co/rest/v1/usuarios?correo=eq.${correo.toLowerCase()}&select=*`,
+          {
+            headers: {
+              'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpibG53YWJ4cXVxYWNubHB2a2ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MDkwNjUsImV4cCI6MjA1MjM4NTA2NX0.GDwrA4vyLkrJpFUXnfKjQKFEFfCMzLS4MQVHYkuBBQo',
+              'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpibG53YWJ4cXVxYWNubHB2a2ZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY4MDkwNjUsImV4cCI6MjA1MjM4NTA2NX0.GDwrA4vyLkrJpFUXnfKjQKFEFfCMzLS4MQVHYkuBBQo'
+            }
+          }
+        );
+        const usuarios = await res.json();
+        
+        if (Array.isArray(usuarios) && usuarios.length > 0) {
+          const usuarioDB = usuarios[0];
+          sessionStorage.setItem('token', 'dev-token-' + Date.now());
+          sessionStorage.setItem('usuario', JSON.stringify(usuarioDB));
+          sessionStorage.setItem('ultimaActividad', Date.now().toString());
+          onLoginSuccess(usuarioDB);
+          return;
+        }
+      } catch (err) {
+        console.error('Error buscando usuario:', err);
+      }
+      
+      // Fallback si no encuentra en BD
       const usuarioDev = {
         correo: correo.toLowerCase(),
         nombre_completo: correo.includes('jescobarp') ? 'Johana Escobar' : 'Usuario Prueba',
@@ -94,10 +124,6 @@ const Login = ({ onLoginSuccess }) => {
       sessionStorage.setItem('usuario', JSON.stringify(usuarioDev));
       sessionStorage.setItem('ultimaActividad', Date.now().toString());
       onLoginSuccess(usuarioDev);
-      return;
-    }
-    if (MODO_DEV && CODIGOS_DEV[correo.toLowerCase()] && CODIGOS_DEV[correo.toLowerCase()] !== codigo) {
-      setError('Código incorrecto. Usa: ' + CODIGOS_DEV[correo.toLowerCase()]);
       return;
     }
     // === FIN MODO DESARROLLO ===
