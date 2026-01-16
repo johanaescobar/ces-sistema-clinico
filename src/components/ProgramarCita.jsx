@@ -10,6 +10,7 @@ const ProgramarCita = () => {
   const [error, setError] = useState('');
   const [accesoPermitido, setAccesoPermitido] = useState(false);
   const [motivoBloqueo, setMotivoBloqueo] = useState('');
+  const [maxCitasPorDia, setMaxCitasPorDia] = useState(2);
 
   // Datos
   const [pacientes, setPacientes] = useState([]);
@@ -82,6 +83,21 @@ const ProgramarCita = () => {
       const horariosData = await resHorarios.json();
       const horarios = Array.isArray(horariosData) ? horariosData : [];
       setHorariosConfig(horarios);
+
+      // Cargar configuración del sistema
+      const resConfig = await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/config_sistema?select=max_citas_por_dia`,
+        {
+          headers: {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+          }
+        }
+      );
+      const configData = await resConfig.json();
+      if (Array.isArray(configData) && configData.length > 0) {
+        setMaxCitasPorDia(configData[0].max_citas_por_dia);
+      }
 
       // 2. Verificar acceso (docentes siempre, estudiantes según horario)
       if (esDocente) {
@@ -322,8 +338,8 @@ const ProgramarCita = () => {
       );
       const citasDelDia = await resCitas.json();
       
-      if (Array.isArray(citasDelDia) && citasDelDia.length >= 2) {
-        setError('Ya tienes 2 pacientes agendados para este día. Máximo permitido: 2');
+      if (Array.isArray(citasDelDia) && citasDelDia.length >= maxCitasPorDia) {
+        setError(`Ya tienes ${maxCitasPorDia} pacientes agendados para este día. Máximo permitido: ${maxCitasPorDia}`);
         return false;
       }
     } catch (err) {
@@ -928,7 +944,7 @@ const ProgramarCita = () => {
                       </div>
                     ))}
                   </div>
-                  {citasDelDia.length >= 2 && (
+                  {citasDelDia.length >= maxCitasPorDia && (
                     <p className="text-xs text-red-600 mt-2 font-medium">
                       ⚠️ Máximo 2 citas por día alcanzado
                     </p>
