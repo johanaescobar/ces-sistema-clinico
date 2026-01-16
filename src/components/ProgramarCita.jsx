@@ -34,28 +34,18 @@ const ProgramarCita = () => {
 
   // Lista genérica de tratamientos
   const tratamientosGenericos = [
+    'Endodoncia',
     'Historia Clínica',
+    'Mantenimiento',
+    'Operatoria',
+    'Periodoncia',
+    'Placa MNR',
     'Presentación de HC',
     'PyP',
-    'Profilaxis',
-    'Detartraje',
-    'Pulido coronal',
-    'Raspaje y alisado radicular',
-    'Operatoria',
-    'Exodoncia',
-    'Endodoncia',
-    'Poste',
-    'Núcleo',
-    'Reconstrucción muñón',
-    'Corona',
-    'Incrustación',
-    'Prótesis removible',
-    'Prótesis total',
-    'Placa MNR',
-    'Mantenimiento',
-    'Reevaluación',
-    'Otro'
-  ];
+    'Rehabilitación PPF',
+    'Rehabilitación PPR',
+    'Rehabilitación PT'
+  ];;
 
   useEffect(() => {
     verificarAccesoYCargarDatos();
