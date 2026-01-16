@@ -1,7 +1,7 @@
 // src/components/AdminPanel.jsx
 import React, { useState, useEffect } from 'react';
 import { 
-  Users, Clock, Calendar, AlertTriangle, BarChart3, 
+  Users, Clock, Calendar, BarChart3, 
   Plus, Trash2, Edit2, Save, X, RefreshCw, Loader2,
   CheckCircle, XCircle, UserPlus, Settings
 } from 'lucide-react';
@@ -14,6 +14,7 @@ const TABS = [
   { id: 'citas', label: 'Citas', icon: Calendar },
   { id: 'horarios', label: 'Horarios', icon: Clock },
   { id: 'festivos', label: 'Festivos', icon: Calendar },
+  { id: 'logs', label: 'Logs', icon: AlertTriangle },
   { id: 'config', label: 'Config', icon: Settings },
   { id: 'estadisticas', label: 'Estadísticas', icon: BarChart3 },
 ];
@@ -1060,6 +1061,7 @@ const AdminPanel = () => {
           {tabActivo === 'citas' && <GestionCitas />}
           {tabActivo === 'horarios' && <GestionHorarios />}
           {tabActivo === 'festivos' && <GestionFestivos />}
+          {tabActivo === 'logs' && <GestionLogs />}
           {tabActivo === 'config' && <GestionConfig />}
           {tabActivo === 'estadisticas' && <Estadisticas />}
         </div>
