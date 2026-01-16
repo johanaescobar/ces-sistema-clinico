@@ -25,7 +25,6 @@ const ProgramarCita = () => {
   const [horaSeleccionada, setHoraSeleccionada] = useState('');
   const [observacion, setObservacion] = useState('');
   // Estados para nuevo paciente
-  const [mostrarFormNuevo, setMostrarFormNuevo] = useState(false);
   const [nuevoPaciente, setNuevoPaciente] = useState({
     primer_nombre: '',
     segundo_nombre: '',
