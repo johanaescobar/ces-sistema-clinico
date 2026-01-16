@@ -278,10 +278,10 @@ const ProgramarCita = () => {
     setPaso(4);
   };
 
-  const validarFecha = (fechaStr) => {
+  const validarFecha = async (fechaStr) => {
     setError('');
     const fecha = new Date(fechaStr + 'T12:00:00');
-    const diaSemana = fecha.getDay(); // 0=dom, 3=mié, 5=vie
+    const diaSemana = fecha.getDay();
 
     // Validar día correcto
     if (diaClinica === 'miercoles' && diaSemana !== 3) {
@@ -305,6 +305,27 @@ const ProgramarCita = () => {
     if (fecha < hoy) {
       setError('No puedes agendar en fechas pasadas');
       return false;
+    }
+
+    // Validar máximo 2 citas por día para este estudiante
+    try {
+      const resCitas = await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/citas?estudiante_id=eq.${usuario.id}&fecha_cita=eq.${fechaStr}&estado=neq.cancelada`,
+        {
+          headers: {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+          }
+        }
+      );
+      const citasDelDia = await resCitas.json();
+      
+      if (Array.isArray(citasDelDia) && citasDelDia.length >= 2) {
+        setError('Ya tienes 2 pacientes agendados para este día. Máximo permitido: 2');
+        return false;
+      }
+    } catch (err) {
+      console.error('Error verificando citas:', err);
     }
 
     setFechaSeleccionada(fechaStr);
