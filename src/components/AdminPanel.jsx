@@ -532,11 +532,20 @@ const GestionHorarios = () => {
     }
   };
 
+  const formatearHora = (hora24) => {
+    if (!hora24) return '';
+    const [h, m] = hora24.split(':').map(Number);
+    const periodo = h >= 12 ? 'PM' : 'AM';
+    const hora12 = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+    return `${hora12}:${m.toString().padStart(2, '0')} ${periodo}`;
+  };
+
   if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
 
   return (
     <div>
-      <h3 className="text-lg font-bold mb-6">Configuración de Horarios</h3>
+      <h3 className="text-lg font-bold mb-2">Configuración de Horarios del Sistema</h3>
+      <p className="text-sm text-gray-500 mb-6">Horas en las que los estudiantes pueden ingresar al sistema</p>
 
       <div className="space-y-4">
         {horarios.map((h) => (
@@ -580,7 +589,7 @@ const GestionHorarios = () => {
                 <div>
                   <span className="font-bold capitalize">{h.dia_semana}</span>
                   <span className="text-gray-600 ml-4">
-                    {h.hora_inicio?.slice(0, 5)} - {h.hora_fin?.slice(0, 5)}
+                    {formatearHora(h.hora_inicio)} - {formatearHora(h.hora_fin)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -755,6 +764,14 @@ const GestionLogs = () => {
     });
   };
 
+  const tiempoTranscurrido = (fecha) => {
+    const mins = Math.floor((new Date() - new Date(fecha)) / 60000);
+    if (mins < 60) return `${mins} min`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} h`;
+    return `${Math.floor(hrs / 24)} días`;
+  };
+
   if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
 
   return (
@@ -809,7 +826,7 @@ const GestionLogs = () => {
                 <th className="text-left p-3">Usuario</th>
                 <th className="text-left p-3">Correo</th>
                 <th className="text-left p-3">Fecha</th>
-                <th className="text-center p-3">Estado</th>
+                <th className="text-center p-3">Hace</th>
               </tr>
             </thead>
             <tbody>
@@ -818,12 +835,8 @@ const GestionLogs = () => {
                   <td className="p-3">{a.usuarios?.nombre_completo || '-'}</td>
                   <td className="p-3 text-sm text-gray-600">{a.usuarios?.correo || '-'}</td>
                   <td className="p-3 text-sm">{formatFecha(a.created_at)}</td>
-                  <td className="p-3 text-center">
-                    {new Date(a.expires_at) > new Date() ? (
-                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs">Activa</span>
-                    ) : (
-                      <span className="bg-gray-100 text-gray-500 px-2 py-1 rounded text-xs">Expirada</span>
-                    )}
+                  <td className="p-3 text-center text-sm text-gray-500">
+                    {tiempoTranscurrido(a.created_at)}
                   </td>
                 </tr>
               ))}
@@ -854,25 +867,40 @@ const Estadisticas = () => {
   const cargar = async () => {
     setCargando(true);
     try {
-      const [estudiantes, pacientes, reporteItems, citas] = await Promise.all([
-        supabaseFetch('usuarios?rol=eq.estudiante&select=id,activo'),
-        supabaseFetch('pacientes?select=id'),
-        supabaseFetch('reporte_items?select=id,estado'),
-        supabaseFetch('citas?select=id')
-      ]);
+      // Consultas separadas para mejor manejo de errores
+      let estudiantes = [];
+      let pacientes = [];
+      let reporteItems = [];
+      let citas = [];
+
+      try {
+        estudiantes = await supabaseFetch('usuarios?rol=eq.estudiante&select=id,activo') || [];
+      } catch (e) { console.error('Error estudiantes:', e); }
+
+      try {
+        pacientes = await supabaseFetch('pacientes?select=id') || [];
+      } catch (e) { console.error('Error pacientes:', e); }
+
+      try {
+        reporteItems = await supabaseFetch('reporte_items?select=id,estado') || [];
+      } catch (e) { console.error('Error reportes:', e); }
+
+      try {
+        citas = await supabaseFetch('citas?select=id') || [];
+      } catch (e) { console.error('Error citas:', e); }
 
       setStats({
-        totalEstudiantes: estudiantes?.length || 0,
-        estudiantesActivos: estudiantes?.filter(e => e.activo).length || 0,
-        totalPacientes: pacientes?.length || 0,
-        totalReportes: reporteItems?.length || 0,
-        reportesPendientes: reporteItems?.filter(r => r.estado === 'pendiente').length || 0,
-        reportesAprobados: reporteItems?.filter(r => r.estado === 'aprobado').length || 0,
-        reportesRechazados: reporteItems?.filter(r => r.estado === 'rechazado').length || 0,
-        citasProgramadas: citas?.length || 0
+        totalEstudiantes: estudiantes.length || 0,
+        estudiantesActivos: estudiantes.filter(e => e.activo).length || 0,
+        totalPacientes: pacientes.length || 0,
+        totalReportes: reporteItems.length || 0,
+        reportesPendientes: reporteItems.filter(r => r.estado === 'pendiente').length || 0,
+        reportesAprobados: reporteItems.filter(r => r.estado === 'aprobado').length || 0,
+        reportesRechazados: reporteItems.filter(r => r.estado === 'rechazado').length || 0,
+        citasProgramadas: citas.length || 0
       });
     } catch (err) {
-      console.error(err);
+      console.error('Error general:', err);
     } finally {
       setCargando(false);
     }
