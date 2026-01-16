@@ -506,6 +506,57 @@ const ProgramarCita = () => {
     }
   };
 
+  // =========================================
+  // INTEGRACIÓN GOOGLE SHEETS
+  // =========================================
+  const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbzdou5FR-ysGEQl-pXWrm37KEPTAtcfU_4dWNzL_-8qzondFt9MFV5GOOmqRK_unNyqyw/exec';
+
+  const convertirHoraParaSheets = (hora24) => {
+    const [h, m] = hora24.split(':').map(Number);
+    const periodo = h >= 12 ? 'p.m.' : 'a.m.';
+    const hora12 = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+    return `${hora12}:${m.toString().padStart(2, '0')} ${periodo}`;
+  };
+
+  const convertirMesParaSheets = (mesNum) => {
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    return meses[mesNum - 1];
+  };
+
+  const enviarAGoogleSheets = async (paciente, fechaCita, horaCita, diaClinicaVal, tratamiento, obs) => {
+    try {
+      const [anio, mes, dia] = fechaCita.split('-');
+      
+      const params = new URLSearchParams({
+        action: 'crear',
+        correo: usuario.correo.toLowerCase(),
+        primerNombre: paciente.primer_nombre,
+        segundoNombre: paciente.segundo_nombre || '',
+        primerApellido: paciente.primer_apellido,
+        segundoApellido: paciente.segundo_apellido || '',
+        cedula: paciente.cedula,
+        celular: paciente.celular,
+        diaClinica: diaClinicaVal === 'miercoles' ? 'Miercoles pm' : 'Viernes am',
+        fechaDia: parseInt(dia, 10).toString(),
+        fechaMes: convertirMesParaSheets(parseInt(mes, 10)),
+        fechaAnio: anio,
+        hora: convertirHoraParaSheets(horaCita),
+        tratamiento: tratamiento,
+        observacion: obs || ''
+      });
+
+      console.log('Enviando a Google Sheets:', params.toString());
+      const response = await fetch(`${SHEETS_API_URL}?${params}`);
+      const data = await response.json();
+      console.log('Respuesta Google Sheets:', data);
+      return data;
+    } catch (err) {
+      console.error('Error enviando a Google Sheets:', err);
+      return null;
+    }
+  };
+
   const confirmarCita = async () => {
     if (!observacion.trim()) {
       setError('La observación es obligatoria');
@@ -516,6 +567,7 @@ const ProgramarCita = () => {
     setError('');
 
     try {
+      // 1. Guardar en Supabase
       const response = await fetch(
         `${SUPABASE_CONFIG.URL}/rest/v1/citas`,
         {
@@ -546,6 +598,17 @@ const ProgramarCita = () => {
 
       const cita = await response.json();
       setCitaCreada(Array.isArray(cita) ? cita[0] : cita);
+
+      // 2. Enviar a Google Sheets (no bloquea si falla)
+      enviarAGoogleSheets(
+        pacienteSeleccionado,
+        fechaSeleccionada,
+        horaSeleccionada,
+        diaClinica,
+        tratamientoSeleccionado,
+        observacion.trim()
+      );
+
       setPaso(7);
     } catch (err) {
       setError('Error al crear la cita: ' + err.message);
