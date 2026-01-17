@@ -29,7 +29,7 @@ const Layout = ({ usuario }) => {
 
   const menuItems = [
     { path: '/inicio', icon: Home, label: 'Inicio', roles: ['docente', 'estudiante'] },
-    { path: '/nuevo-paciente', icon: UserPlus, label: 'Nuevo Paciente', roles: ['estudiante'] },
+    { path: '/nuevo-paciente', icon: FileText, label: 'Nuevo Plan de Tratamiento', roles: ['estudiante'] },
     { path: '/programar-cita', icon: Calendar, label: 'Programar Cita', roles: ['estudiante'] },
     { path: '/reportar', icon: FileText, label: 'Reportar Tratamiento', roles: ['estudiante'] },
     { path: '/mis-pacientes', icon: Users, label: 'Mis Pacientes', roles: ['estudiante'] },
