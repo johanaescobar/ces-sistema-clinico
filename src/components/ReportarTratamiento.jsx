@@ -9,7 +9,6 @@ const ReportarTratamiento = () => {
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState('');
-  const [exito, setExito] = useState(false);
 
   // Datos
   const [pacientes, setPacientes] = useState([]);
@@ -24,7 +23,7 @@ const ReportarTratamiento = () => {
   // Cargar pacientes del estudiante
   useEffect(() => {
     cargarPacientes();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const cargarPacientes = async () => {
     try {
@@ -301,7 +300,6 @@ const ReportarTratamiento = () => {
 
       if (!resItems.ok) throw new Error('Error al guardar tratamientos');
 
-      setExito(true);
       setPaso(3);
 
     } catch (err) {
@@ -318,7 +316,6 @@ const ReportarTratamiento = () => {
     setReportesExistentes([]);
     setSelecciones({});
     setObservacion('');
-    setExito(false);
     setError('');
   };
 
