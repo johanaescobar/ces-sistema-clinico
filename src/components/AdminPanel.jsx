@@ -1114,7 +1114,7 @@ const GestionPlanes = () => {
     setCargando(true);
     try {
       const data = await supabaseFetch(
-        'planes_tratamiento?select=*,pacientes(primer_nombre,primer_apellido,cedula),usuarios!planes_tratamiento_creado_por_fkey(nombre_completo)&order=created_at.desc'
+        'planes_tratamiento?select=*,pacientes(primer_nombre,primer_apellido,cedula)&order=created_at.desc'
       );
       setPlanes(data || []);
     } catch (err) {
