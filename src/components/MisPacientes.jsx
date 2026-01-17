@@ -1,6 +1,6 @@
 // src/components/MisPacientes.jsx
 import React, { useState, useEffect } from 'react';
-import { Users, Edit, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle, X, Calendar, Clock } from 'lucide-react';
+import { Users, Edit, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle, X, Calendar, Clock, Check } from 'lucide-react';
 import { SUPABASE_CONFIG } from '../config/api';
 
 const MisPacientes = () => {
@@ -16,6 +16,7 @@ const MisPacientes = () => {
   const [modalNuevoPlan, setModalNuevoPlan] = useState(null);
   const [textoPlan, setTextoPlan] = useState('');
   const [enviandoPlan, setEnviandoPlan] = useState(false);
+  const [tratamientosAprobados, setTratamientosAprobados] = useState({});
 
   const usuario = JSON.parse(sessionStorage.getItem('usuario') || '{}');
 
@@ -41,10 +42,52 @@ const MisPacientes = () => {
       
       const data = await response.json();
       setPacientes(data);
+
+      // Cargar tratamientos aprobados para todos los pacientes
+      const pacienteIds = data.map(p => p.id);
+      if (pacienteIds.length > 0) {
+        await cargarTratamientosAprobados(pacienteIds);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
       setCargando(false);
+    }
+  };
+
+  const cargarTratamientosAprobados = async (pacienteIds) => {
+    try {
+      const response = await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/reporte_items?estado_aprobacion=eq.aprobado&select=*,reportes_tratamiento!inner(paciente_id)`,
+        {
+          headers: {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+          }
+        }
+      );
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      
+      // Agrupar por paciente_id
+      const agrupados = {};
+      (data || []).forEach(item => {
+        const pacienteId = item.reportes_tratamiento?.paciente_id;
+        if (pacienteId && pacienteIds.includes(pacienteId)) {
+          if (!agrupados[pacienteId]) agrupados[pacienteId] = [];
+          agrupados[pacienteId].push({
+            tipo: item.tipo_tratamiento,
+            especificacion: item.especificacion || '',
+            estado: item.estado_reportado // 'completo' o 'en_proceso'
+          });
+        }
+      });
+
+      setTratamientosAprobados(agrupados);
+    } catch (err) {
+      console.error('Error cargando tratamientos aprobados:', err);
     }
   };
 
@@ -112,7 +155,6 @@ const MisPacientes = () => {
     setEnviandoPlan(true);
     try {
       const paciente = modalNuevoPlan;
-      // Construir texto con datos del paciente + plan
       const textoCompleto = `${paciente.primer_nombre} ${paciente.segundo_nombre || ''} ${paciente.primer_apellido} ${paciente.segundo_apellido || ''}. cc ${paciente.cedula}. cel. ${paciente.celular}. plan de tratamiento: ${textoPlan}`;
       
       const response = await fetch('https://brainlogic.ddnsfree.com/webhook/ces-nuevo-paciente', {
@@ -159,23 +201,103 @@ const MisPacientes = () => {
     }
   };
 
-  const renderPlan = (plan) => {
+  // Verificar si un tratamiento está completado (TT aprobado)
+  const estaCompletado = (pacienteId, tipo, especificacion = '') => {
+    const aprobados = tratamientosAprobados[pacienteId] || [];
+    return aprobados.some(a => 
+      a.tipo === tipo && 
+      a.especificacion === especificacion && 
+      a.estado === 'completo'
+    );
+  };
+
+  // Verificar si está en proceso (EP aprobado)
+  const estaEnProceso = (pacienteId, tipo, especificacion = '') => {
+    const aprobados = tratamientosAprobados[pacienteId] || [];
+    return aprobados.some(a => 
+      a.tipo === tipo && 
+      a.especificacion === especificacion && 
+      a.estado === 'en_proceso'
+    );
+  };
+
+  // Renderizar item con check/estado
+  const renderItem = (pacienteId, tipo, especificacion, texto, key) => {
+    const completado = estaCompletado(pacienteId, tipo, especificacion);
+    const enProceso = estaEnProceso(pacienteId, tipo, especificacion);
+
+    return (
+      <li key={key} className={`flex items-center gap-2 ${completado ? 'text-green-700' : enProceso ? 'text-amber-700' : 'text-gray-700'}`}>
+        {completado ? (
+          <Check size={16} className="text-green-600 flex-shrink-0" />
+        ) : enProceso ? (
+          <span className="w-4 h-4 border-2 border-amber-500 rounded-full flex-shrink-0"></span>
+        ) : (
+          <span className="w-4 h-4 border border-gray-300 rounded-full flex-shrink-0"></span>
+        )}
+        <span className={completado ? 'line-through' : ''}>{texto}</span>
+        {completado && <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">TT</span>}
+        {enProceso && <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">EP</span>}
+      </li>
+    );
+  };
+
+  // Formatear diente con superficie
+  const formatearDienteConSuperficie = (item) => {
+    if (typeof item === 'object') {
+      if (item.superficie) {
+        return `${item.diente} ${item.superficie}`;
+      }
+      return item.diente;
+    }
+    return item;
+  };
+
+  // Formatear corona/incrustación con tipo
+  const formatearConTipo = (item) => {
+    if (typeof item === 'object') {
+      return `${item.diente}${item.tipo ? ` (${item.tipo})` : ''}`;
+    }
+    return item;
+  };
+
+  const renderPlan = (plan, pacienteId) => {
     if (!plan) return <p className="text-gray-500">Sin plan de tratamiento</p>;
 
     return (
       <div className="space-y-4 text-sm">
+        {/* Leyenda */}
+        <div className="flex gap-4 text-xs text-gray-500 border-b pb-2">
+          <span className="flex items-center gap-1"><Check size={12} className="text-green-600" /> TT = Terminado</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 border-2 border-amber-500 rounded-full"></span> EP = En Proceso</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-3 border border-gray-300 rounded-full"></span> Pendiente</span>
+        </div>
+
         {plan.fase_higienica_periodontal && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Higiénica Periodontal</h5>
-            <ul className="list-disc list-inside space-y-1 text-gray-700">
-              {plan.fase_higienica_periodontal.profilaxis && <li>Profilaxis</li>}
-              {plan.fase_higienica_periodontal.detartraje?.generalizado && <li>Detartraje generalizado</li>}
-              {plan.fase_higienica_periodontal.pulido_coronal?.dientes?.length > 0 && (
-                <li>Pulido coronal: {plan.fase_higienica_periodontal.pulido_coronal.dientes.join(', ')}</li>
-              )}
-              {plan.fase_higienica_periodontal.raspaje_alisado_radicular?.dientes?.length > 0 && (
-                <li>Raspaje y alisado radicular: {plan.fase_higienica_periodontal.raspaje_alisado_radicular.dientes.join(', ')}</li>
-              )}
+            <ul className="space-y-1">
+              {plan.fase_higienica_periodontal.profilaxis && 
+                renderItem(pacienteId, 'Profilaxis', '', 'Profilaxis', 'profilaxis')}
+              {plan.fase_higienica_periodontal.detartraje?.generalizado && 
+                renderItem(pacienteId, 'Detartraje', 'Generalizado', 'Detartraje generalizado', 'detartraje-gen')}
+              {plan.fase_higienica_periodontal.detartraje?.dientes?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Detartraje', especificacion, `Detartraje: ${diente}`, `detartraje-${idx}`);
+              })}
+              {plan.fase_higienica_periodontal.pulido_coronal?.generalizado && 
+                renderItem(pacienteId, 'Pulido Coronal', 'Generalizado', 'Pulido coronal generalizado', 'pulido-gen')}
+              {plan.fase_higienica_periodontal.pulido_coronal?.dientes?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Pulido Coronal', especificacion, `Pulido coronal: ${diente}`, `pulido-${idx}`);
+              })}
+              {plan.fase_higienica_periodontal.raspaje_alisado_radicular?.dientes?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Raspaje y Alisado', especificacion, `Raspaje y alisado radicular: ${diente}`, `raspaje-${idx}`);
+              })}
             </ul>
           </div>
         )}
@@ -183,16 +305,22 @@ const MisPacientes = () => {
         {plan.fase_higienica_dental && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Higiénica Dental</h5>
-            <ul className="list-disc list-inside space-y-1 text-gray-700">
-              {plan.fase_higienica_dental.operatoria?.dientes?.length > 0 && (
-                <li>Operatoria: {plan.fase_higienica_dental.operatoria.dientes.join(', ')}</li>
-              )}
-              {plan.fase_higienica_dental.exodoncias?.length > 0 && (
-                <li>Exodoncias: {plan.fase_higienica_dental.exodoncias.join(', ')}</li>
-              )}
-              {plan.fase_higienica_dental.provisionales?.dientes?.length > 0 && (
-                <li>Provisionales: {plan.fase_higienica_dental.provisionales.dientes.join(', ')}</li>
-              )}
+            <ul className="space-y-1">
+              {plan.fase_higienica_dental.operatoria?.dientes?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Operatoria', especificacion, `Operatoria: ${diente}`, `operatoria-${idx}`);
+              })}
+              {plan.fase_higienica_dental.exodoncias?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Exodoncia', especificacion, `Exodoncia: ${diente}`, `exodoncia-${idx}`);
+              })}
+              {plan.fase_higienica_dental.provisionales?.dientes?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Provisional', especificacion, `Provisional: ${diente}`, `provisional-${idx}`);
+              })}
             </ul>
           </div>
         )}
@@ -200,26 +328,36 @@ const MisPacientes = () => {
         {plan.fase_reevaluativa && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Reevaluativa</h5>
-            <p className="text-gray-700">✓ Incluida en el plan</p>
+            <ul className="space-y-1">
+              {renderItem(pacienteId, 'Reevaluación', '', 'Reevaluación', 'reevaluacion')}
+            </ul>
           </div>
         )}
 
         {plan.fase_correctiva_inicial && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Correctiva Inicial</h5>
-            <ul className="list-disc list-inside space-y-1 text-gray-700">
-              {plan.fase_correctiva_inicial.endodoncia?.length > 0 && (
-                <li>Endodoncia: {plan.fase_correctiva_inicial.endodoncia.join(', ')}</li>
-              )}
-              {plan.fase_correctiva_inicial.postes?.length > 0 && (
-                <li>Postes: {plan.fase_correctiva_inicial.postes.join(', ')}</li>
-              )}
-              {plan.fase_correctiva_inicial.nucleos?.length > 0 && (
-                <li>Núcleos: {plan.fase_correctiva_inicial.nucleos.join(', ')}</li>
-              )}
-              {plan.fase_correctiva_inicial.reconstruccion_munon?.length > 0 && (
-                <li>Reconstrucción muñón: {plan.fase_correctiva_inicial.reconstruccion_munon.join(', ')}</li>
-              )}
+            <ul className="space-y-1">
+              {plan.fase_correctiva_inicial.endodoncia?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Endodoncia', especificacion, `Endodoncia: ${diente}`, `endodoncia-${idx}`);
+              })}
+              {plan.fase_correctiva_inicial.postes?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Poste', especificacion, `Poste: ${diente}`, `poste-${idx}`);
+              })}
+              {plan.fase_correctiva_inicial.nucleos?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Núcleo', especificacion, `Núcleo: ${diente}`, `nucleo-${idx}`);
+              })}
+              {plan.fase_correctiva_inicial.reconstruccion_munon?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Reconstrucción Muñón', especificacion, `Reconstrucción muñón: ${diente}`, `munon-${idx}`);
+              })}
             </ul>
           </div>
         )}
@@ -227,17 +365,21 @@ const MisPacientes = () => {
         {plan.fase_correctiva_final && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Correctiva Final</h5>
-            <ul className="list-disc list-inside space-y-1 text-gray-700">
-              {plan.fase_correctiva_final.coronas?.length > 0 && (
-                <li>Coronas: {plan.fase_correctiva_final.coronas.join(', ')}</li>
-              )}
-              {plan.fase_correctiva_final.incrustaciones?.length > 0 && (
-                <li>Incrustaciones: {plan.fase_correctiva_final.incrustaciones.map(i => 
-                  typeof i === 'object' ? `${i.diente}${i.tipo ? ` (${i.tipo})` : ''}` : i
-                ).join(', ')}</li>
-              )}
-              {plan.fase_correctiva_final.protesis_removible && <li>Prótesis removible</li>}
-              {plan.fase_correctiva_final.protesis_total && <li>Prótesis total</li>}
+            <ul className="space-y-1">
+              {plan.fase_correctiva_final.coronas?.map((c, idx) => {
+                const texto = formatearConTipo(c);
+                const especificacion = typeof c === 'object' ? `Diente ${c.diente}` : `Diente ${c}`;
+                return renderItem(pacienteId, 'Corona', especificacion, `Corona: ${texto}`, `corona-${idx}`);
+              })}
+              {plan.fase_correctiva_final.incrustaciones?.map((i, idx) => {
+                const texto = formatearConTipo(i);
+                const especificacion = typeof i === 'object' ? `Diente ${i.diente}` : `Diente ${i}`;
+                return renderItem(pacienteId, 'Incrustación', especificacion, `Incrustación: ${texto}`, `incrustacion-${idx}`);
+              })}
+              {plan.fase_correctiva_final.protesis_removible && 
+                renderItem(pacienteId, 'Prótesis Removible', '', 'Prótesis removible', 'protesis-removible')}
+              {plan.fase_correctiva_final.protesis_total && 
+                renderItem(pacienteId, 'Prótesis Total', '', 'Prótesis total', 'protesis-total')}
             </ul>
           </div>
         )}
@@ -245,7 +387,9 @@ const MisPacientes = () => {
         {plan.fase_mantenimiento && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase de Mantenimiento</h5>
-            <p className="text-gray-700">✓ Incluida en el plan</p>
+            <ul className="space-y-1">
+              {renderItem(pacienteId, 'Mantenimiento', '', 'Mantenimiento', 'mantenimiento')}
+            </ul>
           </div>
         )}
       </div>
@@ -411,7 +555,7 @@ const MisPacientes = () => {
 
                                   {esPlanExpandido && (
                                     <div className="px-4 py-3 border-t bg-white">
-                                      {renderPlan(planFormateado)}
+                                      {renderPlan(planFormateado, paciente.id)}
                                     </div>
                                   )}
                                 </div>
