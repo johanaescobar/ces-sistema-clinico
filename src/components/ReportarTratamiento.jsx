@@ -261,7 +261,7 @@ const ReportarTratamiento = () => {
             estudiante_id: usuario.id,
             fecha_reporte: new Date().toISOString(),
             reporte_texto: observacion || 'Reporte de tratamientos',
-            estado: 'pendiente'
+            estado: 'pendiente_aprobacion'
           })
         }
       );
