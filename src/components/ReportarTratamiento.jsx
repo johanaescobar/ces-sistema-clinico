@@ -277,9 +277,9 @@ const ReportarTratamiento = () => {
         return {
           reporte_id: reporteId,
           tipo_tratamiento: tratamiento.tipo,
-          especificacion: tratamiento.especificacion,
+          especificacion: tratamiento.especificacion || '',
           descripcion: `${tratamiento.tipo} ${tratamiento.especificacion}`.trim(),
-          estado_reportado: estado,
+          estado_reportado: estado === 'TT' ? 'completo' : 'en_proceso',
           estado_aprobacion: 'pendiente',
           actualizado_excel: false
         };
