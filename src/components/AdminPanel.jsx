@@ -46,6 +46,8 @@ const GestionEstudiantes = () => {
   const [nuevo, setNuevo] = useState(false);
   const [form, setForm] = useState({ nombre_completo: '', correo: '', celular: '' });
   const [error, setError] = useState('');
+  const [seleccionados, setSeleccionados] = useState([]);
+  const [eliminando, setEliminando] = useState(false);
 
   const cargar = async () => {
     setCargando(true);
@@ -106,12 +108,68 @@ const GestionEstudiantes = () => {
   };
 
   const eliminar = async (id) => {
-    if (!window.confirm('¿Eliminar este estudiante?')) return;
+    if (!window.confirm('¿Eliminar este estudiante? Sus pacientes quedarán sin asignar.')) return;
     try {
+      // Desasignar pacientes
+      await supabaseFetch(`pacientes?estudiante_actual_id=eq.${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estudiante_actual_id: null })
+      });
+      // Desasignar citas futuras
+      const hoy = new Date().toISOString().split('T')[0];
+      await supabaseFetch(`citas?estudiante_id=eq.${id}&fecha_cita=gte.${hoy}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estudiante_id: null })
+      });
+      // Eliminar estudiante
       await supabaseFetch(`usuarios?id=eq.${id}`, { method: 'DELETE' });
       cargar();
     } catch (err) {
       setError('Error al eliminar');
+    }
+  };
+
+  const eliminarSeleccionados = async () => {
+    if (seleccionados.length === 0) return;
+    if (!window.confirm(`¿Eliminar ${seleccionados.length} estudiantes? Sus pacientes quedarán sin asignar.`)) return;
+    
+    setEliminando(true);
+    try {
+      const hoy = new Date().toISOString().split('T')[0];
+      for (const id of seleccionados) {
+        // Desasignar pacientes
+        await supabaseFetch(`pacientes?estudiante_actual_id=eq.${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ estudiante_actual_id: null })
+        });
+        // Desasignar citas futuras
+        await supabaseFetch(`citas?estudiante_id=eq.${id}&fecha_cita=gte.${hoy}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ estudiante_id: null })
+        });
+        // Eliminar estudiante
+        await supabaseFetch(`usuarios?id=eq.${id}`, { method: 'DELETE' });
+      }
+      setSeleccionados([]);
+      cargar();
+    } catch (err) {
+      setError('Error al eliminar estudiantes');
+    } finally {
+      setEliminando(false);
+    }
+  };
+
+  const toggleSeleccion = (id) => {
+    setSeleccionados(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleTodos = () => {
+    if (seleccionados.length === estudiantes.length) {
+      setSeleccionados([]);
+    } else {
+      setSeleccionados(estudiantes.map(e => e.id));
     }
   };
 
@@ -120,7 +178,19 @@ const GestionEstudiantes = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-bold">Estudiantes ({estudiantes.length})</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-lg font-bold">Estudiantes ({estudiantes.length})</h3>
+          {seleccionados.length > 0 && (
+            <button
+              onClick={eliminarSeleccionados}
+              disabled={eliminando}
+              className="flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm disabled:bg-gray-400"
+            >
+              {eliminando ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+              Eliminar ({seleccionados.length})
+            </button>
+          )}
+        </div>
         <button
           onClick={() => { setNuevo(true); setForm({ nombre_completo: '', correo: '', celular: '' }); }}
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
@@ -172,6 +242,14 @@ const GestionEstudiantes = () => {
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-100">
+              <th className="p-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={seleccionados.length === estudiantes.length && estudiantes.length > 0}
+                  onChange={toggleTodos}
+                  className="w-4 h-4 cursor-pointer"
+                />
+              </th>
               <th className="text-left p-3 font-semibold">Nombre</th>
               <th className="text-left p-3 font-semibold">Correo</th>
               <th className="text-left p-3 font-semibold">Celular</th>
@@ -181,7 +259,15 @@ const GestionEstudiantes = () => {
           </thead>
           <tbody>
             {estudiantes.map((e) => (
-              <tr key={e.id} className="border-b hover:bg-gray-50">
+              <tr key={e.id} className={`border-b hover:bg-gray-50 ${seleccionados.includes(e.id) ? 'bg-red-50' : ''}`}>
+                <td className="p-3">
+                  <input
+                    type="checkbox"
+                    checked={seleccionados.includes(e.id)}
+                    onChange={() => toggleSeleccion(e.id)}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                </td>
                 <td className="p-3">{e.nombre_completo}</td>
                 <td className="p-3 text-sm text-gray-600">{e.correo}</td>
                 <td className="p-3">{e.celular}</td>
@@ -232,6 +318,8 @@ const GestionPacientes = () => {
     celular: '',
     estudiante_actual_id: ''
   });
+  const [seleccionados, setSeleccionados] = useState([]);
+  const [eliminando, setEliminando] = useState(false);
 
   // Obtener usuario actual de sessionStorage
   const usuarioActual = JSON.parse(sessionStorage.getItem('usuario') || '{}');
@@ -397,6 +485,54 @@ const GestionPacientes = () => {
     }
   };
 
+  const eliminarPaciente = async (id) => {
+    if (!window.confirm('¿Eliminar este paciente? Sus citas futuras también se eliminarán.')) return;
+    try {
+      const hoy = new Date().toISOString().split('T')[0];
+      // Eliminar citas futuras
+      await supabaseFetch(`citas?paciente_id=eq.${id}&fecha_cita=gte.${hoy}`, { method: 'DELETE' });
+      // Eliminar paciente
+      await supabaseFetch(`pacientes?id=eq.${id}`, { method: 'DELETE' });
+      cargar();
+    } catch (err) {
+      setError('Error al eliminar paciente');
+    }
+  };
+
+  const eliminarSeleccionados = async () => {
+    if (seleccionados.length === 0) return;
+    if (!window.confirm(`¿Eliminar ${seleccionados.length} pacientes? Sus citas futuras también se eliminarán.`)) return;
+    
+    setEliminando(true);
+    try {
+      const hoy = new Date().toISOString().split('T')[0];
+      for (const id of seleccionados) {
+        await supabaseFetch(`citas?paciente_id=eq.${id}&fecha_cita=gte.${hoy}`, { method: 'DELETE' });
+        await supabaseFetch(`pacientes?id=eq.${id}`, { method: 'DELETE' });
+      }
+      setSeleccionados([]);
+      cargar();
+    } catch (err) {
+      setError('Error al eliminar pacientes');
+    } finally {
+      setEliminando(false);
+    }
+  };
+
+  const toggleSeleccion = (id) => {
+    setSeleccionados(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleTodos = () => {
+    if (seleccionados.length === pacientesFiltrados.length) {
+      setSeleccionados([]);
+    } else {
+      setSeleccionados(pacientesFiltrados.map(p => p.id));
+    }
+  };
+
   const pacientesFiltrados = pacientes.filter(p => {
     const nombre = `${p.primer_nombre} ${p.segundo_nombre || ''} ${p.primer_apellido} ${p.segundo_apellido || ''}`.toLowerCase();
     return nombre.includes(filtro.toLowerCase()) || p.cedula.includes(filtro);
@@ -418,6 +554,16 @@ const GestionPacientes = () => {
           >
             <Plus size={16} /> Nuevo Paciente
           </button>
+          {seleccionados.length > 0 && (
+            <button
+              onClick={eliminarSeleccionados}
+              disabled={eliminando}
+              className="flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm disabled:bg-gray-400"
+            >
+              {eliminando ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+              Eliminar ({seleccionados.length})
+            </button>
+          )}
         </div>
         <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
           <RefreshCw size={20} /> Actualizar
@@ -527,16 +673,32 @@ const GestionPacientes = () => {
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-100">
+              <th className="p-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={seleccionados.length === pacientesFiltrados.length && pacientesFiltrados.length > 0}
+                  onChange={toggleTodos}
+                  className="w-4 h-4 cursor-pointer"
+                />
+              </th>
               <th className="text-left p-3 font-semibold">Paciente</th>
               <th className="text-left p-3 font-semibold">Cédula</th>
               <th className="text-left p-3 font-semibold">Teléfono</th>
               <th className="text-left p-3 font-semibold">Estudiante Asignado</th>
-              <th className="text-left p-3 font-semibold">Registrado</th>
+              <th className="text-left p-3 font-semibold">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {pacientesFiltrados.map((p) => (
-              <tr key={p.id} className="border-b hover:bg-gray-50">
+              <tr key={p.id} className={`border-b hover:bg-gray-50 ${seleccionados.includes(p.id) ? 'bg-red-50' : ''}`}>
+                <td className="p-3">
+                  <input
+                    type="checkbox"
+                    checked={seleccionados.includes(p.id)}
+                    onChange={() => toggleSeleccion(p.id)}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                </td>
                 <td className="p-3">
                   {p.primer_nombre} {p.segundo_nombre || ''} {p.primer_apellido} {p.segundo_apellido || ''}
                 </td>
@@ -554,8 +716,14 @@ const GestionPacientes = () => {
                     ))}
                   </select>
                 </td>
-                <td className="p-3 text-sm text-gray-500">
-                  {new Date(p.created_at).toLocaleDateString('es-CO')}
+                <td className="p-3 text-center">
+                  <button
+                    onClick={() => eliminarPaciente(p.id)}
+                    className="text-red-600 hover:text-red-800"
+                    title="Eliminar paciente"
+                  >
+                    <Trash2 size={18} />
+                  </button>
                 </td>
               </tr>
             ))}
@@ -582,6 +750,8 @@ const GestionCitas = () => {
   const [filtroFecha, setFiltroFecha] = useState('');
   const [estudiantes, setEstudiantes] = useState([]);
   const [sincronizando, setSincronizando] = useState(null);
+  const [seleccionados, setSeleccionados] = useState([]);
+  const [eliminando, setEliminando] = useState(false);
 
   const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbwRWN7ZrF_oJ1PL8plzYoWSQ-S0jiJ-BNWEyVO7JVlxM4DAMy5JLWZIrWKGYku88A8r_A/exec';
 
@@ -672,6 +842,38 @@ const GestionCitas = () => {
     }
   };
 
+  const eliminarSeleccionados = async () => {
+    if (seleccionados.length === 0) return;
+    if (!window.confirm(`¿Eliminar ${seleccionados.length} citas permanentemente?`)) return;
+    
+    setEliminando(true);
+    try {
+      for (const id of seleccionados) {
+        await supabaseFetch(`citas?id=eq.${id}`, { method: 'DELETE' });
+      }
+      setSeleccionados([]);
+      cargar();
+    } catch (err) {
+      console.error('Error eliminando citas:', err);
+    } finally {
+      setEliminando(false);
+    }
+  };
+
+  const toggleSeleccion = (id) => {
+    setSeleccionados(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleTodos = () => {
+    if (seleccionados.length === citasFiltradas.length) {
+      setSeleccionados([]);
+    } else {
+      setSeleccionados(citasFiltradas.map(c => c.id));
+    }
+  };
+
   const reintentarSheets = async (cita) => {
     setSincronizando(cita.id);
     try {
@@ -724,7 +926,19 @@ const GestionCitas = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-bold">Citas Programadas ({citas.length})</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-lg font-bold">Citas Programadas ({citas.length})</h3>
+          {seleccionados.length > 0 && (
+            <button
+              onClick={eliminarSeleccionados}
+              disabled={eliminando}
+              className="flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm disabled:bg-gray-400"
+            >
+              {eliminando ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+              Eliminar ({seleccionados.length})
+            </button>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {citasCanceladas > 0 && (
             <button 
@@ -780,6 +994,14 @@ const GestionCitas = () => {
         <table className="w-full border-collapse">
           <thead>
             <tr className="bg-gray-100">
+              <th className="p-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={seleccionados.length === citasFiltradas.length && citasFiltradas.length > 0}
+                  onChange={toggleTodos}
+                  className="w-4 h-4 cursor-pointer"
+                />
+              </th>
               <th className="text-left p-3 font-semibold">Fecha</th>
               <th className="text-left p-3 font-semibold">Hora</th>
               <th className="text-left p-3 font-semibold">Paciente</th>
@@ -790,9 +1012,18 @@ const GestionCitas = () => {
               <th className="text-center p-3 font-semibold">Acciones</th>
             </tr>
           </thead>
+          </thead>
           <tbody>
             {citasFiltradas.map((c) => (
-              <tr key={c.id} className={`border-b hover:bg-gray-50 ${!c.sincronizado_sheets && c.estado === 'programada' ? 'bg-yellow-50' : ''}`}>
+              <tr key={c.id} className={`border-b hover:bg-gray-50 ${seleccionados.includes(c.id) ? 'bg-red-50' : !c.sincronizado_sheets && c.estado === 'programada' ? 'bg-yellow-50' : ''}`}>
+                <td className="p-3">
+                  <input
+                    type="checkbox"
+                    checked={seleccionados.includes(c.id)}
+                    onChange={() => toggleSeleccion(c.id)}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                </td>
                 <td className="p-3">
                   {new Date(c.fecha_cita + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </td>
