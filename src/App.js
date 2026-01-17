@@ -286,12 +286,12 @@ function App() {
         <Route path="/" element={<Layout usuario={usuario} />}>
           <Route index element={<Inicio usuario={usuario} />} />
           <Route path="inicio" element={<Inicio usuario={usuario} />} />
-          <Route path="nuevo-paciente" element={<NuevoPaciente />} />
-          <Route path="programar-cita" element={<ProgramarCita />} />
-          <Route path="reportar" element={<ReportarTratamiento />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="admin" element={<AdminPanel />} />
-          <Route path="mis-pacientes" element={<MisPacientes />} />
+          <Route path="nuevo-paciente" element={usuario?.rol === 'estudiante' ? <NuevoPaciente /> : <Navigate to="/" replace />} />
+          <Route path="programar-cita" element={usuario?.rol === 'estudiante' ? <ProgramarCita /> : <Navigate to="/" replace />} />
+          <Route path="reportar" element={usuario?.rol === 'estudiante' ? <ReportarTratamiento /> : <Navigate to="/" replace />} />
+          <Route path="mis-pacientes" element={usuario?.rol === 'estudiante' ? <MisPacientes /> : <Navigate to="/" replace />} />
+          <Route path="dashboard" element={usuario?.rol === 'docente' ? <Dashboard /> : <Navigate to="/" replace />} />
+          <Route path="admin" element={usuario?.rol === 'docente' ? <AdminPanel /> : <Navigate to="/" replace />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
