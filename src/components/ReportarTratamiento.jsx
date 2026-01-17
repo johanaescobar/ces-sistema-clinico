@@ -215,10 +215,22 @@ const ReportarTratamiento = () => {
   };
 
   const estaAprobado = (tratamiento) => {
+    // Solo está completamente aprobado si fue aprobado como "completo" (TT)
     return reportesExistentes.some(r => 
       r.tipo_tratamiento === tratamiento.tipo && 
       r.especificacion === tratamiento.especificacion &&
-      r.estado_aprobacion === 'aprobado'
+      r.estado_aprobacion === 'aprobado' &&
+      r.estado_reportado === 'completo'
+    );
+  };
+
+  const estaEnProceso = (tratamiento) => {
+    // Está en proceso si fue aprobado como "en_proceso" (EP)
+    return reportesExistentes.some(r => 
+      r.tipo_tratamiento === tratamiento.tipo && 
+      r.especificacion === tratamiento.especificacion &&
+      r.estado_aprobacion === 'aprobado' &&
+      r.estado_reportado === 'en_proceso'
     );
   };
 
@@ -421,14 +433,18 @@ const ReportarTratamiento = () => {
                   </div>
 
                   {/* Leyenda */}
-                  <div className="flex gap-4 mb-4 text-sm">
+                  <div className="flex flex-wrap gap-4 mb-4 text-sm">
                     <div className="flex items-center gap-2">
                       <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
-                      <span className="text-gray-600">Aprobado (no editable)</span>
+                      <span className="text-gray-600">TT Aprobado (finalizado)</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 bg-amber-100 border border-amber-300 rounded"></div>
+                      <span className="text-gray-600">EP Aprobado (puede continuar)</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-blue-600">TT</span>
-                      <span className="text-gray-600">= Tratamiento Terminado</span>
+                      <span className="text-gray-600">= Terminado</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="font-medium text-amber-600">EP</span>
@@ -446,6 +462,7 @@ const ReportarTratamiento = () => {
                         <div className="space-y-2">
                           {tratamientos.map(t => {
                             const aprobado = estaAprobado(t);
+                            const enProceso = estaEnProceso(t);
                             const seleccion = selecciones[t.id];
 
                             return (
@@ -454,12 +471,14 @@ const ReportarTratamiento = () => {
                                 className={`flex items-center justify-between p-3 rounded-lg border ${
                                   aprobado 
                                     ? 'bg-green-50 border-green-200' 
-                                    : 'bg-white border-gray-200 hover:bg-gray-50'
+                                    : enProceso
+                                      ? 'bg-amber-50 border-amber-200'
+                                      : 'bg-white border-gray-200 hover:bg-gray-50'
                                 }`}
                               >
                                 <div className="flex items-center gap-2">
                                   {aprobado && <CheckCircle size={18} className="text-green-600" />}
-                                  <span className={aprobado ? 'text-green-700' : 'text-gray-800'}>
+                                  <span className={aprobado ? 'text-green-700' : enProceso ? 'text-amber-700' : 'text-gray-800'}>
                                     {t.tipo}
                                     {t.especificacion && <span className="text-gray-500 ml-1">- {t.especificacion}</span>}
                                   </span>
@@ -467,8 +486,34 @@ const ReportarTratamiento = () => {
 
                                 {aprobado ? (
                                   <span className="text-xs bg-green-600 text-white px-2 py-1 rounded">
-                                    ✓ Aprobado
+                                    ✓ TT Aprobado
                                   </span>
+                                ) : enProceso ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs bg-amber-500 text-white px-2 py-1 rounded">
+                                      EP Aprobado
+                                    </span>
+                                    <button
+                                      onClick={() => handleSeleccion(t.id, 'TT')}
+                                      className={`px-3 py-1 rounded text-sm font-medium transition ${
+                                        seleccion === 'TT'
+                                          ? 'bg-blue-600 text-white'
+                                          : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                      }`}
+                                    >
+                                      TT
+                                    </button>
+                                    <button
+                                      onClick={() => handleSeleccion(t.id, 'EP')}
+                                      className={`px-3 py-1 rounded text-sm font-medium transition ${
+                                        seleccion === 'EP'
+                                          ? 'bg-amber-600 text-white'
+                                          : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                                      }`}
+                                    >
+                                      EP
+                                    </button>
+                                  </div>
                                 ) : (
                                   <div className="flex gap-2">
                                     <button
