@@ -222,6 +222,16 @@ const GestionPacientes = () => {
   const [cargando, setCargando] = useState(true);
   const [filtro, setFiltro] = useState('');
   const [error, setError] = useState('');
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [nuevo, setNuevo] = useState({
+    primer_nombre: '',
+    segundo_nombre: '',
+    primer_apellido: '',
+    segundo_apellido: '',
+    cedula: '',
+    celular: '',
+    estudiante_actual_id: ''
+  });
 
   const cargar = async () => {
     setCargando(true);
@@ -241,70 +251,101 @@ const GestionPacientes = () => {
 
   useEffect(() => { cargar(); }, []);
 
-  const cambiarEstudiante = async (pacienteId, nuevoEstudianteId) => {
-  try {
-    // 1. Si no hay nuevo estudiante, solo desasignar
-    if (!nuevoEstudianteId) {
-      await supabaseFetch(`pacientes?id=eq.${pacienteId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ estudiante_actual_id: null })
-      });
-      cargar();
+  const crearPaciente = async () => {
+    if (!nuevo.primer_nombre || !nuevo.primer_apellido || !nuevo.cedula) {
+      setError('Nombre, apellido y cédula son obligatorios');
       return;
     }
 
-    // 2. Verificar citas programadas del paciente
-    const citasPaciente = await supabaseFetch(
-      `citas?paciente_id=eq.${pacienteId}&estado=eq.programada&select=id,fecha_cita,hora`
-    );
+    try {
+      await supabaseFetch('pacientes', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...nuevo,
+          estudiante_actual_id: nuevo.estudiante_actual_id || null
+        })
+      });
+      setMostrarFormulario(false);
+      setNuevo({
+        primer_nombre: '',
+        segundo_nombre: '',
+        primer_apellido: '',
+        segundo_apellido: '',
+        cedula: '',
+        celular: '',
+        estudiante_actual_id: ''
+      });
+      setError('');
+      cargar();
+    } catch (err) {
+      setError('Error al crear paciente');
+    }
+  };
 
-    // 3. Si hay citas, verificar conflictos con el nuevo estudiante
-    if (citasPaciente && citasPaciente.length > 0) {
-      const conflictos = [];
-      
-      for (const cita of citasPaciente) {
-        // Contar citas del nuevo estudiante en ese día
-        const citasNuevoEst = await supabaseFetch(
-          `citas?estudiante_id=eq.${nuevoEstudianteId}&fecha_cita=eq.${cita.fecha_cita}&estado=eq.programada&select=id`
-        );
+  const cambiarEstudiante = async (pacienteId, nuevoEstudianteId) => {
+    try {
+      // 1. Si no hay nuevo estudiante, solo desasignar
+      if (!nuevoEstudianteId) {
+        await supabaseFetch(`pacientes?id=eq.${pacienteId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ estudiante_actual_id: null })
+        });
+        cargar();
+        return;
+      }
+
+      // 2. Verificar citas programadas del paciente
+      const citasPaciente = await supabaseFetch(
+        `citas?paciente_id=eq.${pacienteId}&estado=eq.programada&select=id,fecha_cita,hora`
+      );
+
+      // 3. Si hay citas, verificar conflictos con el nuevo estudiante
+      if (citasPaciente && citasPaciente.length > 0) {
+        const conflictos = [];
         
-        if (citasNuevoEst && citasNuevoEst.length >= 2) {
-          conflictos.push(`${cita.fecha_cita}: ya tiene 2 citas`);
+        for (const cita of citasPaciente) {
+          // Contar citas del nuevo estudiante en ese día
+          const citasNuevoEst = await supabaseFetch(
+            `citas?estudiante_id=eq.${nuevoEstudianteId}&fecha_cita=eq.${cita.fecha_cita}&estado=eq.programada&select=id`
+          );
+          
+          if (citasNuevoEst && citasNuevoEst.length >= 2) {
+            conflictos.push(`${cita.fecha_cita}: ya tiene 2 citas`);
+          }
+        }
+
+        // Mostrar advertencia si hay conflictos
+        if (conflictos.length > 0) {
+          const nuevoEst = estudiantes.find(e => e.id === nuevoEstudianteId);
+          const confirmar = window.confirm(
+            `⚠️ ${nuevoEst?.nombre_completo || 'El estudiante'} tiene conflictos:\n\n` +
+            conflictos.join('\n') + 
+            `\n\n¿Reasignar de todas formas?`
+          );
+          
+          if (!confirmar) return;
         }
       }
 
-      // Mostrar advertencia si hay conflictos
-      if (conflictos.length > 0) {
-        const nuevoEst = estudiantes.find(e => e.id === nuevoEstudianteId);
-        const confirmar = window.confirm(
-          `⚠️ ${nuevoEst?.nombre_completo || 'El estudiante'} tiene conflictos:\n\n` +
-          conflictos.join('\n') + 
-          `\n\n¿Reasignar de todas formas?`
-        );
-        
-        if (!confirmar) return;
-      }
-    }
-
-    // 4. Reasignar paciente
-    await supabaseFetch(`pacientes?id=eq.${pacienteId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ estudiante_actual_id: nuevoEstudianteId })
-    });
-
-    // 5. Reasignar citas programadas
-    if (citasPaciente && citasPaciente.length > 0) {
-      await supabaseFetch(`citas?paciente_id=eq.${pacienteId}&estado=eq.programada`, {
+      // 4. Reasignar paciente
+      await supabaseFetch(`pacientes?id=eq.${pacienteId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ estudiante_id: nuevoEstudianteId })
+        body: JSON.stringify({ estudiante_actual_id: nuevoEstudianteId })
       });
-    }
 
-    cargar();
-  } catch (err) {
-    setError('Error al asignar estudiante');
-  }
-};
+      // 5. Reasignar citas programadas
+      if (citasPaciente && citasPaciente.length > 0) {
+        await supabaseFetch(`citas?paciente_id=eq.${pacienteId}&estado=eq.programada`, {
+          method: 'PATCH',
+          body: JSON.stringify({ estudiante_id: nuevoEstudianteId })
+        });
+      }
+
+      cargar();
+    } catch (err) {
+      setError('Error al asignar estudiante');
+    }
+  };
 
   const pacientesFiltrados = pacientes.filter(p => {
     const nombre = `${p.primer_nombre} ${p.segundo_nombre || ''} ${p.primer_apellido} ${p.segundo_apellido || ''}`.toLowerCase();
@@ -316,13 +357,95 @@ const GestionPacientes = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-bold">Pacientes ({pacientes.length})</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-lg font-bold">Pacientes ({pacientes.length})</h3>
+          <button
+            onClick={() => setMostrarFormulario(!mostrarFormulario)}
+            className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
+          >
+            <Plus size={16} /> Nuevo Paciente
+          </button>
+        </div>
         <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
           <RefreshCw size={20} /> Actualizar
         </button>
       </div>
 
       {error && <div className="bg-red-100 text-red-700 px-4 py-2 rounded-lg mb-4">{error}</div>}
+
+      {mostrarFormulario && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <h4 className="font-bold text-blue-800 mb-3">Nuevo Paciente</h4>
+          <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+            <input
+              type="text"
+              placeholder="Primer nombre *"
+              value={nuevo.primer_nombre}
+              onChange={(e) => setNuevo({...nuevo, primer_nombre: e.target.value})}
+              className="border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              placeholder="Segundo nombre"
+              value={nuevo.segundo_nombre}
+              onChange={(e) => setNuevo({...nuevo, segundo_nombre: e.target.value})}
+              className="border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              placeholder="Primer apellido *"
+              value={nuevo.primer_apellido}
+              onChange={(e) => setNuevo({...nuevo, primer_apellido: e.target.value})}
+              className="border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              placeholder="Segundo apellido"
+              value={nuevo.segundo_apellido}
+              onChange={(e) => setNuevo({...nuevo, segundo_apellido: e.target.value})}
+              className="border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              placeholder="Cédula *"
+              value={nuevo.cedula}
+              onChange={(e) => setNuevo({...nuevo, cedula: e.target.value})}
+              className="border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              placeholder="Celular"
+              value={nuevo.celular}
+              onChange={(e) => setNuevo({...nuevo, celular: e.target.value})}
+              className="border rounded px-3 py-2"
+            />
+            <select
+              value={nuevo.estudiante_actual_id}
+              onChange={(e) => setNuevo({...nuevo, estudiante_actual_id: e.target.value})}
+              className="border rounded px-3 py-2"
+            >
+              <option value="">Asignar a estudiante (opcional)</option>
+              {estudiantes.map(e => (
+                <option key={e.id} value={e.id}>{e.nombre_completo}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={crearPaciente}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center gap-1"
+            >
+              <Save size={16} /> Guardar
+            </button>
+            <button
+              onClick={() => setMostrarFormulario(false)}
+              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 flex items-center gap-1"
+            >
+              <X size={16} /> Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mb-4">
         <input
