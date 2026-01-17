@@ -48,6 +48,7 @@ const Dashboard = () => {
             correo: estudiante?.correo || '',
             paciente: paciente ? `${paciente.primer_nombre} ${paciente.primer_apellido}` : 'Sin paciente',
             cedula: paciente?.cedula || '',
+            observacion: reporte?.reporte_texto || '',
             items: []
           };
         }
@@ -242,6 +243,15 @@ const Dashboard = () => {
                 <span className="text-sm text-purple-600">CC: {reporte.cedula}</span>
               </div>
             </div>
+
+            {/* Observación del estudiante */}
+            {reporte.observacion && reporte.observacion !== 'Reporte de tratamientos' && (
+              <div className="px-6 py-3 bg-yellow-50 border-b">
+                <p className="text-sm text-yellow-800">
+                  <span className="font-medium">📝 Observación:</span> {reporte.observacion}
+                </p>
+              </div>
+            )}
 
             {/* Items del reporte */}
             <div className="divide-y">
