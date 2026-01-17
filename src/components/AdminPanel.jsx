@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Clock, Calendar, AlertTriangle, BarChart3, 
   Plus, Trash2, Edit2, Save, X, RefreshCw, Loader2,
-  CheckCircle, XCircle, UserPlus, Settings
+  CheckCircle, XCircle, UserPlus, Settings, FileText
 } from 'lucide-react';
 import { SUPABASE_CONFIG } from '../config/api';
 
@@ -11,6 +11,7 @@ import { SUPABASE_CONFIG } from '../config/api';
 const TABS = [
   { id: 'estudiantes', label: 'Estudiantes', icon: Users },
   { id: 'pacientes', label: 'Pacientes', icon: UserPlus },
+  { id: 'planes', label: 'Planes', icon: FileText },
   { id: 'citas', label: 'Citas', icon: Calendar },
   { id: 'horarios', label: 'Horarios', icon: Clock },
   { id: 'festivos', label: 'Festivos', icon: Calendar },
@@ -1100,6 +1101,186 @@ const GestionCitas = () => {
 };
 
 // =============================================
+// COMPONENTE: GESTIÓN DE PLANES DE TRATAMIENTO
+// =============================================
+const GestionPlanes = () => {
+  const [planes, setPlanes] = useState([]);
+  const [cargando, setCargando] = useState(true);
+  const [filtro, setFiltro] = useState('');
+  const [seleccionados, setSeleccionados] = useState([]);
+  const [eliminando, setEliminando] = useState(false);
+
+  const cargar = async () => {
+    setCargando(true);
+    try {
+      const data = await supabaseFetch(
+        'planes_tratamiento?select=*,pacientes(primer_nombre,primer_apellido,cedula),usuarios!planes_tratamiento_creado_por_fkey(nombre_completo)&order=created_at.desc'
+      );
+      setPlanes(data || []);
+    } catch (err) {
+      console.error('Error cargando planes:', err);
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const planesFiltrados = planes.filter(p => {
+    const nombrePaciente = `${p.pacientes?.primer_nombre || ''} ${p.pacientes?.primer_apellido || ''}`.toLowerCase();
+    const cedula = p.pacientes?.cedula || '';
+    return nombrePaciente.includes(filtro.toLowerCase()) || cedula.includes(filtro);
+  });
+
+  const eliminarPlan = async (id) => {
+    if (!window.confirm('¿Eliminar este plan de tratamiento?')) return;
+    try {
+      await supabaseFetch(`planes_tratamiento?id=eq.${id}`, { method: 'DELETE' });
+      cargar();
+    } catch (err) {
+      console.error('Error eliminando plan:', err);
+    }
+  };
+
+  const eliminarSeleccionados = async () => {
+    if (seleccionados.length === 0) return;
+    if (!window.confirm(`¿Eliminar ${seleccionados.length} planes de tratamiento?`)) return;
+    
+    setEliminando(true);
+    try {
+      for (const id of seleccionados) {
+        await supabaseFetch(`planes_tratamiento?id=eq.${id}`, { method: 'DELETE' });
+      }
+      setSeleccionados([]);
+      cargar();
+    } catch (err) {
+      console.error('Error eliminando planes:', err);
+    } finally {
+      setEliminando(false);
+    }
+  };
+
+  const toggleSeleccion = (id) => {
+    setSeleccionados(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const toggleTodos = () => {
+    if (seleccionados.length === planesFiltrados.length) {
+      setSeleccionados([]);
+    } else {
+      setSeleccionados(planesFiltrados.map(p => p.id));
+    }
+  };
+
+  if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center gap-4">
+          <h3 className="text-lg font-bold">Planes de Tratamiento ({planes.length})</h3>
+          {seleccionados.length > 0 && (
+            <button
+              onClick={eliminarSeleccionados}
+              disabled={eliminando}
+              className="flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm disabled:bg-gray-400"
+            >
+              {eliminando ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+              Eliminar ({seleccionados.length})
+            </button>
+          )}
+        </div>
+        <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
+          <RefreshCw size={20} /> Actualizar
+        </button>
+      </div>
+
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Buscar por paciente o cédula..."
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+          className="w-full md:w-96 border rounded-lg px-4 py-2"
+        />
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="p-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={seleccionados.length === planesFiltrados.length && planesFiltrados.length > 0}
+                  onChange={toggleTodos}
+                  className="w-4 h-4 cursor-pointer"
+                />
+              </th>
+              <th className="text-left p-3 font-semibold">Paciente</th>
+              <th className="text-left p-3 font-semibold">Cédula</th>
+              <th className="text-left p-3 font-semibold">Creado por</th>
+              <th className="text-center p-3 font-semibold">Estado</th>
+              <th className="text-left p-3 font-semibold">Fecha</th>
+              <th className="text-center p-3 font-semibold">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {planesFiltrados.map((p) => (
+              <tr key={p.id} className={`border-b hover:bg-gray-50 ${seleccionados.includes(p.id) ? 'bg-red-50' : ''}`}>
+                <td className="p-3">
+                  <input
+                    type="checkbox"
+                    checked={seleccionados.includes(p.id)}
+                    onChange={() => toggleSeleccion(p.id)}
+                    className="w-4 h-4 cursor-pointer"
+                  />
+                </td>
+                <td className="p-3">
+                  {p.pacientes?.primer_nombre} {p.pacientes?.primer_apellido}
+                </td>
+                <td className="p-3">{p.pacientes?.cedula}</td>
+                <td className="p-3 text-sm">{p.usuarios?.nombre_completo}</td>
+                <td className="p-3 text-center">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    p.estado === 'aprobado' ? 'bg-green-100 text-green-700' :
+                    p.estado === 'pendiente_aprobacion' ? 'bg-yellow-100 text-yellow-700' :
+                    p.estado === 'finalizado' ? 'bg-blue-100 text-blue-700' :
+                    'bg-gray-100 text-gray-700'
+                  }`}>
+                    {p.estado}
+                  </span>
+                </td>
+                <td className="p-3 text-sm text-gray-500">
+                  {new Date(p.created_at).toLocaleDateString('es-CO')}
+                </td>
+                <td className="p-3 text-center">
+                  <button
+                    onClick={() => eliminarPlan(p.id)}
+                    className="text-red-600 hover:text-red-800"
+                    title="Eliminar plan"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {planesFiltrados.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          No se encontraron planes de tratamiento
+        </div>
+      )}
+    </div>
+  );
+};
+
+// =============================================
 // COMPONENTE: GESTIÓN DE HORARIOS
 // =============================================
 const GestionHorarios = () => {
@@ -1702,6 +1883,7 @@ const AdminPanel = () => {
           {tabActivo === 'estudiantes' && <GestionEstudiantes />}
           {tabActivo === 'pacientes' && <GestionPacientes />}
           {tabActivo === 'citas' && <GestionCitas />}
+          {tabActivo === 'planes' && <GestionPlanes />}
           {tabActivo === 'horarios' && <GestionHorarios />}
           {tabActivo === 'festivos' && <GestionFestivos />}
           {tabActivo === 'logs' && <GestionLogs />}
