@@ -797,13 +797,17 @@ const formatearTelefono = (tel) => {
 
               {pacientes.length === 0 ? (
                 <p className="text-gray-500 text-center py-4">
-                  No tienes pacientes con plan asignado.
+                  No tienes pacientes registrados.
                 </p>
               ) : (
-                <>
-                  <p className="text-sm text-gray-500 mb-2">Pacientes con plan aprobado:</p>
-                  <div className="space-y-2 max-h-72 overflow-y-auto">
-                    {pacientes.map(p => (
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {[...pacientes]
+                    .sort((a, b) => {
+                      const nombreA = `${a.primer_nombre} ${a.primer_apellido}`.toLowerCase();
+                      const nombreB = `${b.primer_nombre} ${b.primer_apellido}`.toLowerCase();
+                      return nombreA.localeCompare(nombreB);
+                    })
+                    .map(p => (
                       <button
                         key={p.id}
                         onClick={() => seleccionarPaciente(p)}
@@ -817,8 +821,7 @@ const formatearTelefono = (tel) => {
                         </div>
                       </button>
                     ))}
-                  </div>
-                </>
+                </div>
               )}
             </div>
           )}
