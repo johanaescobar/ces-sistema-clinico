@@ -19,9 +19,12 @@ const TIMEOUT_DOCENTES_MINUTOS = 360; // 6 horas
 const Inicio = ({ usuario }) => {
   const [citasProximas, setCitasProximas] = useState([]);
   const [cargandoCitas, setCargandoCitas] = useState(true);
+  const [rechazos, setRechazos] = useState([]);
+  const [cargandoRechazos, setCargandoRechazos] = useState(true);
 
   useEffect(() => {
     if (usuario?.rol === 'estudiante' && usuario?.id) {
+      // Cargar citas
       const cargarCitas = async () => {
         try {
           const hoy = new Date().toISOString().split('T')[0];
@@ -42,9 +45,33 @@ const Inicio = ({ usuario }) => {
           setCargandoCitas(false);
         }
       };
+
+      // Cargar rechazos
+      const cargarRechazos = async () => {
+        try {
+          const res = await fetch(
+            `${SUPABASE_CONFIG.URL}/rest/v1/reporte_items?estado_aprobacion=eq.rechazado&select=*,reportes_tratamiento!inner(estudiante_id,pacientes:paciente_id(primer_nombre,primer_apellido))&reportes_tratamiento.estudiante_id=eq.${usuario.id}`,
+            {
+              headers: {
+                'apikey': SUPABASE_CONFIG.ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+              }
+            }
+          );
+          const data = await res.json();
+          setRechazos(Array.isArray(data) ? data : []);
+        } catch (err) {
+          console.error('Error cargando rechazos:', err);
+        } finally {
+          setCargandoRechazos(false);
+        }
+      };
+
       cargarCitas();
+      cargarRechazos();
     } else {
       setCargandoCitas(false);
+      setCargandoRechazos(false);
     }
   }, [usuario]);
 
@@ -71,6 +98,37 @@ const Inicio = ({ usuario }) => {
         
         {usuario?.rol === 'estudiante' ? (
           <>
+            {/* Alerta de rechazos */}
+            {!cargandoRechazos && rechazos.length > 0 && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-300 rounded-lg">
+                <h3 className="font-bold text-red-800 mb-3 flex items-center gap-2">
+                  ⚠️ Tratamientos Rechazados ({rechazos.length})
+                </h3>
+                <div className="space-y-2">
+                  {rechazos.map(r => (
+                    <div key={r.id} className="bg-white p-3 rounded border border-red-200">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-gray-800">
+                          {r.tipo_tratamiento} {r.especificacion && `- ${r.especificacion}`}
+                        </span>
+                        <span className="text-sm text-gray-500">
+                          {r.reportes_tratamiento?.pacientes?.primer_nombre} {r.reportes_tratamiento?.pacientes?.primer_apellido}
+                        </span>
+                      </div>
+                      {r.comentario_aprobacion && (
+                        <p className="text-sm text-red-700 bg-red-50 p-2 rounded">
+                          <strong>Motivo:</strong> {r.comentario_aprobacion}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm text-red-600 mt-3">
+                  Debes corregir estos tratamientos y reportarlos nuevamente.
+                </p>
+              </div>
+            )}
+
             <div className="grid gap-4 md:grid-cols-3">
               <Link to="/programar-cita" className="bg-green-50 p-4 rounded-lg border border-green-200 hover:bg-green-100 hover:shadow-md transition cursor-pointer">
                 <h3 className="font-bold text-green-800 mb-2">📅 Programar Cita</h3>
@@ -284,16 +342,16 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Layout usuario={usuario} />}>
-          <Route index element={<Inicio usuario={usuario} />} />
+          <Route index element={<Navigate to="/inicio" replace />} />
           <Route path="inicio" element={<Inicio usuario={usuario} />} />
-          <Route path="nuevo-paciente" element={usuario?.rol === 'estudiante' ? <NuevoPaciente /> : <Navigate to="/" replace />} />
-          <Route path="programar-cita" element={usuario?.rol === 'estudiante' ? <ProgramarCita /> : <Navigate to="/" replace />} />
-          <Route path="reportar" element={usuario?.rol === 'estudiante' ? <ReportarTratamiento /> : <Navigate to="/" replace />} />
-          <Route path="mis-pacientes" element={usuario?.rol === 'estudiante' ? <MisPacientes /> : <Navigate to="/" replace />} />
-          <Route path="dashboard" element={usuario?.rol === 'docente' ? <Dashboard /> : <Navigate to="/" replace />} />
-          <Route path="admin" element={usuario?.rol === 'docente' ? <AdminPanel /> : <Navigate to="/" replace />} />
+          <Route path="nuevo-paciente" element={usuario?.rol === 'estudiante' ? <NuevoPaciente /> : <Navigate to="/inicio" replace />} />
+          <Route path="programar-cita" element={usuario?.rol === 'estudiante' ? <ProgramarCita /> : <Navigate to="/inicio" replace />} />
+          <Route path="reportar" element={usuario?.rol === 'estudiante' ? <ReportarTratamiento /> : <Navigate to="/inicio" replace />} />
+          <Route path="mis-pacientes" element={usuario?.rol === 'estudiante' ? <MisPacientes /> : <Navigate to="/inicio" replace />} />
+          <Route path="dashboard" element={usuario?.rol === 'docente' ? <Dashboard /> : <Navigate to="/inicio" replace />} />
+          <Route path="admin" element={usuario?.rol === 'docente' ? <AdminPanel /> : <Navigate to="/inicio" replace />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/inicio" replace />} />
       </Routes>
     </BrowserRouter>
   );
