@@ -253,7 +253,13 @@ const MisPacientes = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              {pacientes.map(paciente => {
+              {[...pacientes]
+                .sort((a, b) => {
+                  const nombreA = `${a.primer_nombre} ${a.primer_apellido}`.toLowerCase();
+                  const nombreB = `${b.primer_nombre} ${b.primer_apellido}`.toLowerCase();
+                  return nombreA.localeCompare(nombreB);
+                })
+                .map(paciente => {
                 const planes = paciente.planes_tratamiento || [];
                 const planesOrdenados = [...planes].sort((a, b) => 
                   new Date(b.created_at) - new Date(a.created_at)
