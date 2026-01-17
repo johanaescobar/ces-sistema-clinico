@@ -72,13 +72,13 @@ const Inicio = ({ usuario }) => {
         {usuario?.rol === 'estudiante' ? (
           <>
             <div className="grid gap-4 md:grid-cols-3">
-              <Link to="/nuevo-paciente" className="bg-blue-50 p-4 rounded-lg border border-blue-200 hover:bg-blue-100 hover:shadow-md transition cursor-pointer">
-                <h3 className="font-bold text-blue-800 mb-2">📋 Nuevo Paciente</h3>
-                <p className="text-sm text-blue-600">Registra pacientes con su plan de tratamiento</p>
-              </Link>
               <Link to="/programar-cita" className="bg-green-50 p-4 rounded-lg border border-green-200 hover:bg-green-100 hover:shadow-md transition cursor-pointer">
                 <h3 className="font-bold text-green-800 mb-2">📅 Programar Cita</h3>
                 <p className="text-sm text-green-600">Agenda citas para tus pacientes</p>
+              </Link>
+              <Link to="/mis-pacientes" className="bg-teal-50 p-4 rounded-lg border border-teal-200 hover:bg-teal-100 hover:shadow-md transition cursor-pointer">
+                <h3 className="font-bold text-teal-800 mb-2">👥 Mis Pacientes</h3>
+                <p className="text-sm text-teal-600">Ver pacientes y cargar planes</p>
               </Link>
               <Link to="/reportar" className="bg-purple-50 p-4 rounded-lg border border-purple-200 hover:bg-purple-100 hover:shadow-md transition cursor-pointer">
                 <h3 className="font-bold text-purple-800 mb-2">📝 Reportar</h3>
