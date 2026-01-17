@@ -549,7 +549,7 @@ const GestionHorarios = () => {
   const cargar = async () => {
     setCargando(true);
     try {
-      const data = await supabaseFetch('config_horarios?order=dia_semana');
+      const data = await supabaseFetch('config_horarios?order=orden');
       setHorarios(data || []);
     } catch (err) {
       console.error(err);
