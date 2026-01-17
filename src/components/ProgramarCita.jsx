@@ -509,7 +509,7 @@ const ProgramarCita = () => {
   // =========================================
   // INTEGRACIÓN GOOGLE SHEETS
   // =========================================
-  const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbzdou5FR-ysGEQl-pXWrm37KEPTAtcfU_4dWNzL_-8qzondFt9MFV5GOOmqRK_unNyqyw/exec';
+  const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbwRWN7ZrF_oJ1PL8plzYoWSQ-S0jiJ-BNWEyVO7JVlxM4DAMy5JLWZIrWKGYku88A8r_A/exec';
 
   const convertirHoraParaSheets = (hora24) => {
     const [h, m] = hora24.split(':').map(Number);
