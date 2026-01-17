@@ -1,6 +1,6 @@
 // src/App.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Link, useNavigate } from 'react-router-dom';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import NuevoPaciente from './components/NuevoPaciente';
@@ -49,8 +49,9 @@ const Inicio = ({ usuario }) => {
       // Cargar rechazos
       const cargarRechazos = async () => {
         try {
-          const res = await fetch(
-            `${SUPABASE_CONFIG.URL}/rest/v1/reporte_items?estado_aprobacion=eq.rechazado&select=*,reportes_tratamiento!inner(estudiante_id,pacientes:paciente_id(primer_nombre,primer_apellido))&reportes_tratamiento.estudiante_id=eq.${usuario.id}`,
+          // Primero obtener los rechazos
+          const resRechazos = await fetch(
+            `${SUPABASE_CONFIG.URL}/rest/v1/reporte_items?estado_aprobacion=eq.rechazado&select=*,reportes_tratamiento!inner(estudiante_id,pacientes:paciente_id(primer_nombre,primer_apellido)),usuarios:aprobado_por(nombre_completo)&reportes_tratamiento.estudiante_id=eq.${usuario.id}`,
             {
               headers: {
                 'apikey': SUPABASE_CONFIG.ANON_KEY,
@@ -58,8 +59,37 @@ const Inicio = ({ usuario }) => {
               }
             }
           );
-          const data = await res.json();
-          setRechazos(Array.isArray(data) ? data : []);
+          const rechazosData = await resRechazos.json();
+          
+          if (!Array.isArray(rechazosData) || rechazosData.length === 0) {
+            setRechazos([]);
+            setCargandoRechazos(false);
+            return;
+          }
+
+          // Obtener los aprobados para filtrar los que ya fueron corregidos
+          const resAprobados = await fetch(
+            `${SUPABASE_CONFIG.URL}/rest/v1/reporte_items?estado_aprobacion=eq.aprobado&select=tipo_tratamiento,especificacion,created_at,reportes_tratamiento!inner(estudiante_id)&reportes_tratamiento.estudiante_id=eq.${usuario.id}`,
+            {
+              headers: {
+                'apikey': SUPABASE_CONFIG.ANON_KEY,
+                'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+              }
+            }
+          );
+          const aprobadosData = await resAprobados.json();
+
+          // Filtrar: mostrar rechazos solo si NO hay un aprobado posterior
+          const rechazosActivos = rechazosData.filter(rechazo => {
+            const aprobadoPosterior = (aprobadosData || []).find(apr => 
+              apr.tipo_tratamiento === rechazo.tipo_tratamiento &&
+              apr.especificacion === rechazo.especificacion &&
+              new Date(apr.created_at) > new Date(rechazo.created_at)
+            );
+            return !aprobadoPosterior;
+          });
+
+          setRechazos(rechazosActivos);
         } catch (err) {
           console.error('Error cargando rechazos:', err);
         } finally {
@@ -118,6 +148,11 @@ const Inicio = ({ usuario }) => {
                       {r.comentario_aprobacion && (
                         <p className="text-sm text-red-700 bg-red-50 p-2 rounded">
                           <strong>Motivo:</strong> {r.comentario_aprobacion}
+                        </p>
+                      )}
+                      {r.usuarios?.nombre_completo && (
+                        <p className="text-xs text-gray-500 mt-1 text-right">
+                          Rechazado por: Dra. {r.usuarios.nombre_completo}
                         </p>
                       )}
                     </div>
@@ -217,10 +252,23 @@ const SesionExpirada = ({ onVolver }) => (
   </div>
 );
 
+// Componente para forzar redirección a inicio
+const InicioRedirect = ({ onRedirected }) => {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    navigate('/inicio', { replace: true });
+    onRedirected();
+  }, [navigate, onRedirected]);
+  
+  return null;
+};
+
 function App() {
   const [usuario, setUsuario] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sesionExpirada, setSesionExpirada] = useState(false);
+  const [irAInicio, setIrAInicio] = useState(false);
 
   // Función para cerrar sesión
   const cerrarSesion = useCallback((porInactividad = false) => {
@@ -266,6 +314,7 @@ function App() {
       
       setUsuario(usuarioData);
       sessionStorage.setItem('ultimaActividad', Date.now().toString());
+      setIrAInicio(true);
     }
     
     setLoading(false);
@@ -335,11 +384,15 @@ function App() {
     return <Login onLoginSuccess={(u) => {
       setUsuario(u);
       setSesionExpirada(false);
+      setIrAInicio(true);
     }} />;
   }
 
   return (
     <BrowserRouter>
+      {irAInicio && (
+        <InicioRedirect onRedirected={() => setIrAInicio(false)} />
+      )}
       <Routes>
         <Route path="/" element={<Layout usuario={usuario} />}>
           <Route index element={<Navigate to="/inicio" replace />} />
