@@ -581,6 +581,9 @@ const GestionCitas = () => {
   const [filtroEstudiante, setFiltroEstudiante] = useState('');
   const [filtroFecha, setFiltroFecha] = useState('');
   const [estudiantes, setEstudiantes] = useState([]);
+  const [sincronizando, setSincronizando] = useState(null);
+
+  const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbwRWN7ZrF_oJ1PL8plzYoWSQ-S0jiJ-BNWEyVO7JVlxM4DAMy5JLWZIrWKGYku88A8r_A/exec';
 
   const formatearHora = (hora24) => {
     if (!hora24) return '';
@@ -590,11 +593,24 @@ const GestionCitas = () => {
     return `${hora12}:${m.toString().padStart(2, '0')} ${periodo}`;
   };
 
+  const convertirHoraParaSheets = (hora24) => {
+    const [h, m] = hora24.split(':').map(Number);
+    const periodo = h >= 12 ? 'p.m.' : 'a.m.';
+    const hora12 = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+    return `${hora12}:${m.toString().padStart(2, '0')} ${periodo}`;
+  };
+
+  const convertirMesParaSheets = (mesNum) => {
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    return meses[mesNum - 1];
+  };
+
   const cargar = async () => {
     setCargando(true);
     try {
       const [citasData, estData] = await Promise.all([
-        supabaseFetch('citas?select=*,pacientes(primer_nombre,primer_apellido,cedula),usuarios!citas_estudiante_id_fkey(nombre_completo)&order=fecha_cita.desc,hora'),
+        supabaseFetch('citas?select=*,pacientes(primer_nombre,primer_apellido,segundo_nombre,segundo_apellido,cedula,celular),usuarios!citas_estudiante_id_fkey(nombre_completo,correo)&order=fecha_cita.desc,hora'),
         supabaseFetch('usuarios?rol=eq.estudiante&activo=eq.true&select=id,nombre_completo')
       ]);
       setCitas(citasData || []);
@@ -627,16 +643,111 @@ const GestionCitas = () => {
     }
   };
 
+  const eliminarCita = async (id) => {
+    if (!window.confirm('¿Eliminar esta cita permanentemente? Esta acción no se puede deshacer.')) return;
+    try {
+      await supabaseFetch(`citas?id=eq.${id}`, {
+        method: 'DELETE'
+      });
+      cargar();
+    } catch (err) {
+      console.error('Error eliminando cita:', err);
+    }
+  };
+
+  const eliminarTodasCanceladas = async () => {
+    const canceladas = citas.filter(c => c.estado === 'cancelada');
+    if (canceladas.length === 0) {
+      alert('No hay citas canceladas para eliminar');
+      return;
+    }
+    if (!window.confirm(`¿Eliminar ${canceladas.length} citas canceladas permanentemente?`)) return;
+    try {
+      await supabaseFetch(`citas?estado=eq.cancelada`, {
+        method: 'DELETE'
+      });
+      cargar();
+    } catch (err) {
+      console.error('Error eliminando citas:', err);
+    }
+  };
+
+  const reintentarSheets = async (cita) => {
+    setSincronizando(cita.id);
+    try {
+      const [anio, mes, dia] = cita.fecha_cita.split('-');
+      
+      const params = new URLSearchParams({
+        action: 'crear',
+        correo: cita.usuarios?.correo?.toLowerCase() || '',
+        primerNombre: cita.pacientes?.primer_nombre || '',
+        segundoNombre: cita.pacientes?.segundo_nombre || '',
+        primerApellido: cita.pacientes?.primer_apellido || '',
+        segundoApellido: cita.pacientes?.segundo_apellido || '',
+        cedula: cita.pacientes?.cedula || '',
+        celular: cita.pacientes?.celular || '',
+        diaClinica: cita.dia_clinica,
+        fechaDia: parseInt(dia, 10).toString(),
+        fechaMes: convertirMesParaSheets(parseInt(mes, 10)),
+        fechaAnio: anio,
+        hora: convertirHoraParaSheets(cita.hora),
+        tratamiento: cita.tratamiento_programado || '',
+        observacion: cita.observacion || ''
+      });
+
+      const response = await fetch(`${SHEETS_API_URL}?${params}`);
+      const result = await response.json();
+
+      if (result && result.ok) {
+        await supabaseFetch(`citas?id=eq.${cita.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ sincronizado_sheets: true })
+        });
+        alert('✅ Sincronizado con Google Sheets');
+        cargar();
+      } else {
+        alert('❌ Error al sincronizar: ' + (result?.error || 'Sin respuesta'));
+      }
+    } catch (err) {
+      console.error('Error sincronizando:', err);
+      alert('❌ Error de conexión con Google Sheets');
+    } finally {
+      setSincronizando(null);
+    }
+  };
+
+  const citasSinSincronizar = citas.filter(c => c.estado === 'programada' && !c.sincronizado_sheets).length;
+  const citasCanceladas = citas.filter(c => c.estado === 'cancelada').length;
+
   if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
 
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-lg font-bold">Citas Programadas ({citas.length})</h3>
-        <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
-          <RefreshCw size={20} /> Actualizar
-        </button>
+        <div className="flex items-center gap-2">
+          {citasCanceladas > 0 && (
+            <button 
+              onClick={eliminarTodasCanceladas}
+              className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm"
+            >
+              <Trash2 size={16} /> Eliminar canceladas ({citasCanceladas})
+            </button>
+          )}
+          <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
+            <RefreshCw size={20} /> Actualizar
+          </button>
+        </div>
       </div>
+
+      {citasSinSincronizar > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 flex items-center gap-2">
+          <AlertTriangle className="text-yellow-600" size={20} />
+          <span className="text-yellow-800 text-sm">
+            {citasSinSincronizar} cita(s) no sincronizada(s) con Google Sheets
+          </span>
+        </div>
+      )}
 
       <div className="flex gap-4 mb-4 flex-wrap">
         <select
@@ -675,12 +786,13 @@ const GestionCitas = () => {
               <th className="text-left p-3 font-semibold">Estudiante</th>
               <th className="text-left p-3 font-semibold">Tratamiento</th>
               <th className="text-center p-3 font-semibold">Estado</th>
+              <th className="text-center p-3 font-semibold">Sheets</th>
               <th className="text-center p-3 font-semibold">Acciones</th>
             </tr>
           </thead>
           <tbody>
             {citasFiltradas.map((c) => (
-              <tr key={c.id} className="border-b hover:bg-gray-50">
+              <tr key={c.id} className={`border-b hover:bg-gray-50 ${!c.sincronizado_sheets && c.estado === 'programada' ? 'bg-yellow-50' : ''}`}>
                 <td className="p-3">
                   {new Date(c.fecha_cita + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })}
                 </td>
@@ -702,14 +814,45 @@ const GestionCitas = () => {
                 </td>
                 <td className="p-3 text-center">
                   {c.estado === 'programada' && (
-                    <button
-                      onClick={() => cancelarCita(c.id)}
-                      className="text-red-600 hover:text-red-800"
-                      title="Cancelar cita"
-                    >
-                      <XCircle size={18} />
-                    </button>
+                    c.sincronizado_sheets ? (
+                      <CheckCircle size={18} className="text-green-600 mx-auto" title="Sincronizado" />
+                    ) : (
+                      <button
+                        onClick={() => reintentarSheets(c)}
+                        disabled={sincronizando === c.id}
+                        className="text-yellow-600 hover:text-yellow-800"
+                        title="Reintentar sincronización"
+                      >
+                        {sincronizando === c.id ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <AlertTriangle size={18} />
+                        )}
+                      </button>
+                    )
                   )}
+                </td>
+                <td className="p-3 text-center">
+                  <div className="flex items-center justify-center gap-1">
+                    {c.estado === 'programada' && (
+                      <button
+                        onClick={() => cancelarCita(c.id)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Cancelar cita"
+                      >
+                        <XCircle size={18} />
+                      </button>
+                    )}
+                    {c.estado === 'cancelada' && (
+                      <button
+                        onClick={() => eliminarCita(c.id)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Eliminar permanentemente"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}

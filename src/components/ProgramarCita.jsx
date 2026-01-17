@@ -589,69 +589,85 @@ const formatearTelefono = (tel) => {
   };
 
   const confirmarCita = async () => {
-    if (!observacion.trim()) {
-      setError('La observación es obligatoria');
-      return;
+  if (!observacion.trim()) {
+    setError('La observación es obligatoria');
+    return;
+  }
+
+  setEnviando(true);
+  setError('');
+
+  try {
+    // 1. Guardar en Supabase (sincronizado_sheets = false por defecto)
+    const response = await fetch(
+      `${SUPABASE_CONFIG.URL}/rest/v1/citas`,
+      {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_CONFIG.ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          paciente_id: pacienteSeleccionado.id,
+          estudiante_id: usuario.id,
+          fecha_cita: fechaSeleccionada,
+          dia_clinica: diaClinica === 'miercoles' ? 'Miercoles pm' : 'Viernes am',
+          hora: horaSeleccionada,
+          tratamiento_programado: tratamientoSeleccionado,
+          observacion: observacion.trim(),
+          estado: 'programada',
+          sincronizado_sheets: false
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const errData = await response.json();
+      throw new Error(errData.message || 'Error al crear cita');
     }
 
-    setEnviando(true);
-    setError('');
+    const citaData = await response.json();
+    const citaCreada = Array.isArray(citaData) ? citaData[0] : citaData;
+    setCitaCreada(citaCreada);
 
-    try {
-      // 1. Guardar en Supabase
-      const response = await fetch(
-        `${SUPABASE_CONFIG.URL}/rest/v1/citas`,
+    // 2. Enviar a Google Sheets
+    const sheetsResult = await enviarAGoogleSheets(
+      pacienteSeleccionado,
+      fechaSeleccionada,
+      horaSeleccionada,
+      diaClinica,
+      tratamientoSeleccionado,
+      observacion.trim()
+    );
+
+    if (sheetsResult && sheetsResult.ok) {
+      // Actualizar sincronizado_sheets = true
+      await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/citas?id=eq.${citaCreada.id}`,
         {
-          method: 'POST',
+          method: 'PATCH',
           headers: {
             'apikey': SUPABASE_CONFIG.ANON_KEY,
             'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
-            'Content-Type': 'application/json',
-            'Prefer': 'return=representation'
+            'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            paciente_id: pacienteSeleccionado.id,
-            estudiante_id: usuario.id,
-            fecha_cita: fechaSeleccionada,
-            dia_clinica: diaClinica === 'miercoles' ? 'Miercoles pm' : 'Viernes am',
-            hora: horaSeleccionada,
-            tratamiento_programado: tratamientoSeleccionado,
-            observacion: observacion.trim(),
-            estado: 'programada'
-          })
+          body: JSON.stringify({ sincronizado_sheets: true })
         }
       );
-
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.message || 'Error al crear cita');
-      }
-
-      const cita = await response.json();
-      setCitaCreada(Array.isArray(cita) ? cita[0] : cita);
-
-      // 2. Enviar a Google Sheets (no bloquea si falla)
-      const sheetsResult = await enviarAGoogleSheets(
-        pacienteSeleccionado,
-        fechaSeleccionada,
-        horaSeleccionada,
-        diaClinica,
-        tratamientoSeleccionado,
-        observacion.trim()
-      );
-
-      if (!sheetsResult || !sheetsResult.ok) {
-        console.warn('Google Sheets falló:', sheetsResult);
-        alert('⚠️ Cita guardada, pero no se pudo sincronizar con Google Sheets.\n\nContacta a la Dra. Escobar para verificar.');
-      }
-
-      setPaso(7);
-    } catch (err) {
-      setError('Error al crear la cita: ' + err.message);
-    } finally {
-      setEnviando(false);
+    } else {
+      console.warn('Google Sheets falló:', sheetsResult);
+      alert('⚠️ Cita guardada, pero no se pudo sincronizar con Google Sheets.\n\nLa Dra. Escobar podrá reintentarlo desde su panel.');
     }
-  };
+
+    setPaso(7);
+  } catch (err) {
+    setError('Error al crear la cita: ' + err.message);
+  } finally {
+    setEnviando(false);
+  }
+};
 
   const reiniciar = () => {
     setPacienteSeleccionado(null);
