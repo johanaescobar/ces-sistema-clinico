@@ -540,7 +540,7 @@ const formatearTelefono = (tel) => {
   // =========================================
   // INTEGRACIÓN GOOGLE SHEETS
   // =========================================
-  const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbwRWN7ZrF_oJ1PL8plzYoWSQ-S0jiJ-BNWEyVO7JVlxM4DAMy5JLWZIrWKGYku88A8r_A/exec';
+  const SHEETS_API_URL = 'https://script.google.com/macros/s/AKfycbyj6bBpLxFGzogm8QXX3oLzRIz3LdyAbP8yVzLABXt-iA_f5PChCoOi6yYTjtZLgCXG6g/exec';
 
   const convertirHoraParaSheets = (hora24) => {
     const [h, m] = hora24.split(':').map(Number);
