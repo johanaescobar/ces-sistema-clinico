@@ -1012,7 +1012,6 @@ const GestionCitas = () => {
               <th className="text-center p-3 font-semibold">Acciones</th>
             </tr>
           </thead>
-          </thead>
           <tbody>
             {citasFiltradas.map((c) => (
               <tr key={c.id} className={`border-b hover:bg-gray-50 ${seleccionados.includes(c.id) ? 'bg-red-50' : !c.sincronizado_sheets && c.estado === 'programada' ? 'bg-yellow-50' : ''}`}>
