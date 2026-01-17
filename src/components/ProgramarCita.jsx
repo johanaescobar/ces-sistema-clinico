@@ -61,6 +61,29 @@ const ProgramarCita = () => {
     'Rehabilitación PT'
   ];
 
+  // Validar teléfono
+const validarTelefono = (tel) => {
+  const digitos = tel.replace(/\D/g, '');
+  if (digitos.length === 10 && digitos.startsWith('3')) {
+    return { valido: true, tipo: 'celular' };
+  } else if (digitos.length === 7) {
+    return { valido: true, tipo: 'fijo' };
+  }
+  return { valido: false, tipo: null };
+};
+
+// Formatear teléfono para visualización
+const formatearTelefono = (tel) => {
+  if (!tel) return '';
+  const digitos = tel.replace(/\D/g, '');
+  if (digitos.length === 10) {
+    return `${digitos.slice(0,3)} · ${digitos.slice(3,6)} · ${digitos.slice(6,8)} · ${digitos.slice(8,10)}`;
+  } else if (digitos.length === 7) {
+    return `${digitos.slice(0,3)} · ${digitos.slice(3,5)} · ${digitos.slice(5,7)}`;
+  }
+  return tel;
+};
+
   useEffect(() => {
     verificarAccesoYCargarDatos();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -438,73 +461,81 @@ const ProgramarCita = () => {
   };
 
   const guardarNuevoPaciente = async () => {
-    setGuardandoPaciente(true);
-    setError('');
+  setGuardandoPaciente(true);
+  setError('');
 
-    try {
-      // Verificar si ya existe por cédula
-      const resExiste = await fetch(
-        `${SUPABASE_CONFIG.URL}/rest/v1/pacientes?cedula=eq.${nuevoPaciente.cedula}`,
+  // Validar teléfono
+  const telValidacion = validarTelefono(nuevoPaciente.celular);
+  if (!telValidacion.valido) {
+    setError('Teléfono inválido. Celular: 10 dígitos empezando con 3. Fijo: 7 dígitos.');
+    setGuardandoPaciente(false);
+    return;
+  }
+
+  try {
+    // Verificar si ya existe por cédula
+    const resExiste = await fetch(
+      `${SUPABASE_CONFIG.URL}/rest/v1/pacientes?cedula=eq.${nuevoPaciente.cedula}`,
+      {
+        headers: {
+          'apikey': SUPABASE_CONFIG.ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+        }
+      }
+    );
+    const existentes = await resExiste.json();
+
+    let paciente;
+
+    if (Array.isArray(existentes) && existentes.length > 0) {
+      // Ya existe, usar el existente
+      paciente = existentes[0];
+    } else {
+      // Crear nuevo paciente
+      const response = await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/pacientes`,
         {
+          method: 'POST',
           headers: {
             'apikey': SUPABASE_CONFIG.ANON_KEY,
-            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
-          }
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify({
+            primer_nombre: nuevoPaciente.primer_nombre.trim(),
+            segundo_nombre: nuevoPaciente.segundo_nombre.trim() || null,
+            primer_apellido: nuevoPaciente.primer_apellido.trim(),
+            segundo_apellido: nuevoPaciente.segundo_apellido.trim() || null,
+            cedula: nuevoPaciente.cedula.replace(/\D/g, ''),
+            celular: nuevoPaciente.celular.replace(/\D/g, ''),
+            registrado_por: usuario.id,
+            estudiante_actual_id: usuario.id
+          })
         }
       );
-      const existentes = await resExiste.json();
 
-      let paciente;
-
-      if (Array.isArray(existentes) && existentes.length > 0) {
-        // Ya existe, usar el existente
-        paciente = existentes[0];
-      } else {
-        // Crear nuevo paciente
-        const response = await fetch(
-          `${SUPABASE_CONFIG.URL}/rest/v1/pacientes`,
-          {
-            method: 'POST',
-            headers: {
-              'apikey': SUPABASE_CONFIG.ANON_KEY,
-              'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            },
-            body: JSON.stringify({
-              primer_nombre: nuevoPaciente.primer_nombre.trim(),
-              segundo_nombre: nuevoPaciente.segundo_nombre.trim() || null,
-              primer_apellido: nuevoPaciente.primer_apellido.trim(),
-              segundo_apellido: nuevoPaciente.segundo_apellido.trim() || null,
-              cedula: nuevoPaciente.cedula.trim(),
-              celular: nuevoPaciente.celular.trim(),
-              registrado_por: usuario.id,
-              estudiante_actual_id: usuario.id
-            })
-          }
-        );
-
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.message || 'Error al crear paciente');
-        }
-
-        const data = await response.json();
-        paciente = Array.isArray(data) ? data[0] : data;
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.message || 'Error al crear paciente');
       }
 
-      // Seleccionar el paciente y continuar
-      setPacienteSeleccionado(paciente);
-      setTratamientosPlan([]); // Sin plan de tratamiento
-      setNuevoPaciente({ primer_nombre: '', segundo_nombre: '', primer_apellido: '', segundo_apellido: '', cedula: '', celular: '' });
-      setPaso(2);
-
-    } catch (err) {
-      setError('Error al guardar paciente: ' + err.message);
-    } finally {
-      setGuardandoPaciente(false);
+      const data = await response.json();
+      paciente = Array.isArray(data) ? data[0] : data;
     }
-  };
+
+    // Seleccionar el paciente y continuar
+    setPacienteSeleccionado(paciente);
+    setTratamientosPlan([]); // Sin plan de tratamiento
+    setNuevoPaciente({ primer_nombre: '', segundo_nombre: '', primer_apellido: '', segundo_apellido: '', cedula: '', celular: '' });
+    setPaso(2);
+
+  } catch (err) {
+    setError('Error al guardar paciente: ' + err.message);
+  } finally {
+    setGuardandoPaciente(false);
+  }
+};
 
   // =========================================
   // INTEGRACIÓN GOOGLE SHEETS
@@ -1180,20 +1211,31 @@ const ProgramarCita = () => {
                     <input
                       type="text"
                       value={nuevoPaciente.cedula}
-                      onChange={(e) => setNuevoPaciente({...nuevoPaciente, cedula: e.target.value})}
+                      onChange={(e) => setNuevoPaciente({...nuevoPaciente, cedula: e.target.value.replace(/\D/g, '')})}
                       className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Ej: 42875672"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-600 mb-1">Celular *</label>
+                    <label className="block text-sm text-gray-600 mb-1">Teléfono * (cel: 10, fijo: 7)</label>
                     <input
                       type="text"
                       value={nuevoPaciente.celular}
-                      onChange={(e) => setNuevoPaciente({...nuevoPaciente, celular: e.target.value})}
-                      className="w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      onChange={(e) => setNuevoPaciente({...nuevoPaciente, celular: e.target.value.replace(/\D/g, '')})}
+                      className={`w-full p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        nuevoPaciente.celular && !validarTelefono(nuevoPaciente.celular).valido ? 'border-red-500' : 
+                        nuevoPaciente.celular && validarTelefono(nuevoPaciente.celular).valido ? 'border-green-500' : ''
+                      }`}
                       placeholder="Ej: 3136415316"
                     />
+                    {nuevoPaciente.celular && (
+                      <p className={`text-xs mt-1 ${validarTelefono(nuevoPaciente.celular).valido ? 'text-green-600' : 'text-red-600'}`}>
+                        {validarTelefono(nuevoPaciente.celular).valido 
+                          ? `${validarTelefono(nuevoPaciente.celular).tipo === 'celular' ? '📱 Celular' : '📞 Fijo'}: ${formatearTelefono(nuevoPaciente.celular)}`
+                          : 'Celular: 10 dígitos (3xx). Fijo: 7 dígitos'
+                        }
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

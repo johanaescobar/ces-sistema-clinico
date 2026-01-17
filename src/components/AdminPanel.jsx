@@ -233,6 +233,34 @@ const GestionPacientes = () => {
     estudiante_actual_id: ''
   });
 
+  // Obtener usuario actual de sessionStorage
+  const usuarioActual = JSON.parse(sessionStorage.getItem('usuario') || '{}');
+
+  // Formatear teléfono para visualización
+  const formatearTelefono = (tel) => {
+    if (!tel) return '';
+    const digitos = tel.replace(/\D/g, '');
+    if (digitos.length === 10) {
+      // Celular: 316 · 471 · 33 · 00
+      return `${digitos.slice(0,3)} · ${digitos.slice(3,6)} · ${digitos.slice(6,8)} · ${digitos.slice(8,10)}`;
+    } else if (digitos.length === 7) {
+      // Fijo: 613 · 36 · 79
+      return `${digitos.slice(0,3)} · ${digitos.slice(3,5)} · ${digitos.slice(5,7)}`;
+    }
+    return tel;
+  };
+
+  // Validar teléfono
+  const validarTelefono = (tel) => {
+    const digitos = tel.replace(/\D/g, '');
+    if (digitos.length === 10 && digitos.startsWith('3')) {
+      return { valido: true, tipo: 'celular' };
+    } else if (digitos.length === 7) {
+      return { valido: true, tipo: 'fijo' };
+    }
+    return { valido: false, tipo: null };
+  };
+
   const cargar = async () => {
     setCargando(true);
     try {
@@ -252,8 +280,26 @@ const GestionPacientes = () => {
   useEffect(() => { cargar(); }, []);
 
   const crearPaciente = async () => {
+    // Validar campos obligatorios
     if (!nuevo.primer_nombre || !nuevo.primer_apellido || !nuevo.cedula) {
       setError('Nombre, apellido y cédula son obligatorios');
+      return;
+    }
+
+    if (!nuevo.celular) {
+      setError('El teléfono es obligatorio');
+      return;
+    }
+
+    // Validar formato de teléfono
+    const telValidacion = validarTelefono(nuevo.celular);
+    if (!telValidacion.valido) {
+      setError('Teléfono inválido. Celular: 10 dígitos empezando con 3. Fijo: 7 dígitos.');
+      return;
+    }
+
+    if (!nuevo.estudiante_actual_id) {
+      setError('Debe asignar un estudiante');
       return;
     }
 
@@ -261,8 +307,14 @@ const GestionPacientes = () => {
       await supabaseFetch('pacientes', {
         method: 'POST',
         body: JSON.stringify({
-          ...nuevo,
-          estudiante_actual_id: nuevo.estudiante_actual_id || null
+          primer_nombre: nuevo.primer_nombre,
+          segundo_nombre: nuevo.segundo_nombre || null,
+          primer_apellido: nuevo.primer_apellido,
+          segundo_apellido: nuevo.segundo_apellido || null,
+          cedula: nuevo.cedula,
+          celular: nuevo.celular.replace(/\D/g, ''), // Solo dígitos
+          estudiante_actual_id: nuevo.estudiante_actual_id,
+          registrado_por: usuarioActual.id
         })
       });
       setMostrarFormulario(false);
@@ -304,7 +356,6 @@ const GestionPacientes = () => {
         const conflictos = [];
         
         for (const cita of citasPaciente) {
-          // Contar citas del nuevo estudiante en ese día
           const citasNuevoEst = await supabaseFetch(
             `citas?estudiante_id=eq.${nuevoEstudianteId}&fecha_cita=eq.${cita.fecha_cita}&estado=eq.programada&select=id`
           );
@@ -314,7 +365,6 @@ const GestionPacientes = () => {
           }
         }
 
-        // Mostrar advertencia si hay conflictos
         if (conflictos.length > 0) {
           const nuevoEst = estudiantes.find(e => e.id === nuevoEstudianteId);
           const confirmar = window.confirm(
@@ -351,6 +401,9 @@ const GestionPacientes = () => {
     const nombre = `${p.primer_nombre} ${p.segundo_nombre || ''} ${p.primer_apellido} ${p.segundo_apellido || ''}`.toLowerCase();
     return nombre.includes(filtro.toLowerCase()) || p.cedula.includes(filtro);
   });
+
+  // Obtener validación en tiempo real del teléfono
+  const telValidacion = validarTelefono(nuevo.celular);
 
   if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
 
@@ -409,22 +462,35 @@ const GestionPacientes = () => {
               type="text"
               placeholder="Cédula *"
               value={nuevo.cedula}
-              onChange={(e) => setNuevo({...nuevo, cedula: e.target.value})}
+              onChange={(e) => setNuevo({...nuevo, cedula: e.target.value.replace(/\D/g, '')})}
               className="border rounded px-3 py-2"
             />
-            <input
-              type="text"
-              placeholder="Celular"
-              value={nuevo.celular}
-              onChange={(e) => setNuevo({...nuevo, celular: e.target.value})}
-              className="border rounded px-3 py-2"
-            />
+            <div>
+              <input
+                type="text"
+                placeholder="Teléfono * (cel: 10 dígitos, fijo: 7)"
+                value={nuevo.celular}
+                onChange={(e) => setNuevo({...nuevo, celular: e.target.value.replace(/\D/g, '')})}
+                className={`border rounded px-3 py-2 w-full ${
+                  nuevo.celular && !telValidacion.valido ? 'border-red-500' : 
+                  nuevo.celular && telValidacion.valido ? 'border-green-500' : ''
+                }`}
+              />
+              {nuevo.celular && (
+                <p className={`text-xs mt-1 ${telValidacion.valido ? 'text-green-600' : 'text-red-600'}`}>
+                  {telValidacion.valido 
+                    ? `${telValidacion.tipo === 'celular' ? '📱 Celular' : '📞 Fijo'}: ${formatearTelefono(nuevo.celular)}`
+                    : 'Celular: 10 dígitos (3xx). Fijo: 7 dígitos'
+                  }
+                </p>
+              )}
+            </div>
             <select
               value={nuevo.estudiante_actual_id}
               onChange={(e) => setNuevo({...nuevo, estudiante_actual_id: e.target.value})}
               className="border rounded px-3 py-2"
             >
-              <option value="">Asignar a estudiante (opcional)</option>
+              <option value="">Asignar a estudiante *</option>
               {estudiantes.map(e => (
                 <option key={e.id} value={e.id}>{e.nombre_completo}</option>
               ))}
@@ -438,7 +504,7 @@ const GestionPacientes = () => {
               <Save size={16} /> Guardar
             </button>
             <button
-              onClick={() => setMostrarFormulario(false)}
+              onClick={() => { setMostrarFormulario(false); setError(''); }}
               className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 flex items-center gap-1"
             >
               <X size={16} /> Cancelar
@@ -463,7 +529,7 @@ const GestionPacientes = () => {
             <tr className="bg-gray-100">
               <th className="text-left p-3 font-semibold">Paciente</th>
               <th className="text-left p-3 font-semibold">Cédula</th>
-              <th className="text-left p-3 font-semibold">Celular</th>
+              <th className="text-left p-3 font-semibold">Teléfono</th>
               <th className="text-left p-3 font-semibold">Estudiante Asignado</th>
               <th className="text-left p-3 font-semibold">Registrado</th>
             </tr>
@@ -475,7 +541,7 @@ const GestionPacientes = () => {
                   {p.primer_nombre} {p.segundo_nombre || ''} {p.primer_apellido} {p.segundo_apellido || ''}
                 </td>
                 <td className="p-3">{p.cedula}</td>
-                <td className="p-3">{p.celular}</td>
+                <td className="p-3">{formatearTelefono(p.celular)}</td>
                 <td className="p-3">
                   <select
                     value={p.estudiante_actual_id || ''}
