@@ -21,7 +21,7 @@ const NuevoPaciente = () => {
 
     try {
       const token = localStorage.getItem('token');
-      const usuario = JSON.parse(localStorage.getItem('usuario') || '{}');
+      const usuario = JSON.parse(sessionStorage.getItem('usuario') || '{}');
 
       const response = await fetch(API_ENDPOINTS.NUEVO_PACIENTE, {
         method: 'POST',
