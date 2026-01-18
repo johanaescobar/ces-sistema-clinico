@@ -4,7 +4,7 @@ import {
   Users, Clock, Calendar, AlertTriangle, BarChart3, 
   Plus, Trash2, Edit2, Save, X, RefreshCw, Loader2,
   CheckCircle, XCircle, UserPlus, Settings, FileText,
-  ChevronDown, ChevronUp, Check
+  ChevronDown, ChevronUp
 } from 'lucide-react';
 import { SUPABASE_CONFIG } from '../config/api';
 
@@ -522,13 +522,13 @@ const GestionPacientes = () => {
     );
   };
 
-  const toggleTodos = () => {
-    if (seleccionados.length === pacientesFiltrados.length) {
-      setSeleccionados([]);
-    } else {
-      setSeleccionados(pacientesFiltrados.map(p => p.id));
-    }
-  };
+  //const toggleTodos = () => {
+  //  if (seleccionados.length === pacientesFiltrados.length) {
+ //     setSeleccionados([]);
+ //   } else {
+  //    setSeleccionados(pacientesFiltrados.map(p => p.id));
+ //   }
+ // };
 
   const pacientesFiltrados = pacientes.filter(p => {
     const nombre = `${p.primer_nombre} ${p.segundo_nombre || ''} ${p.primer_apellido} ${p.segundo_apellido || ''}`.toLowerCase();
@@ -1166,13 +1166,13 @@ const GestionPlanes = () => {
     setSeleccionados(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  const toggleTodos = () => {
-    if (seleccionados.length === planesFiltrados.length) {
-      setSeleccionados([]);
-    } else {
-      setSeleccionados(planesFiltrados.map(p => p.id));
-    }
-  };
+  //const toggleTodos = () => {
+  //  if (seleccionados.length === planesFiltrados.length) {
+  //    setSeleccionados([]);
+  //  } else {
+  //    setSeleccionados(planesFiltrados.map(p => p.id));
+  //  }
+ // };
 
   // Funciones para renderizar plan
   const formatearPlan = (planCompleto) => {
