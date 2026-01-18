@@ -487,12 +487,23 @@ const GestionPacientes = () => {
   };
 
   const eliminarPaciente = async (id) => {
-    if (!window.confirm('¿Eliminar este paciente? Sus citas futuras también se eliminarán.')) return;
+    if (!window.confirm('¿Eliminar este paciente? Todos sus datos (citas, planes, reportes) se eliminarán.')) return;
     try {
-      const hoy = new Date().toISOString().split('T')[0];
-      // Eliminar citas futuras
-      await supabaseFetch(`citas?paciente_id=eq.${id}&fecha_cita=gte.${hoy}`, { method: 'DELETE' });
-      // Eliminar paciente
+      // 1. Eliminar items de reportes
+      const reportes = await supabaseFetch(`reportes_tratamiento?paciente_id=eq.${id}&select=id`);
+      if (reportes && reportes.length > 0) {
+        const reporteIds = reportes.map(r => r.id);
+        for (const rid of reporteIds) {
+          await supabaseFetch(`reporte_items?reporte_id=eq.${rid}`, { method: 'DELETE' });
+        }
+      }
+      // 2. Eliminar reportes
+      await supabaseFetch(`reportes_tratamiento?paciente_id=eq.${id}`, { method: 'DELETE' });
+      // 3. Eliminar planes
+      await supabaseFetch(`planes_tratamiento?paciente_id=eq.${id}`, { method: 'DELETE' });
+      // 4. Eliminar todas las citas
+      await supabaseFetch(`citas?paciente_id=eq.${id}`, { method: 'DELETE' });
+      // 5. Eliminar paciente
       await supabaseFetch(`pacientes?id=eq.${id}`, { method: 'DELETE' });
       cargar();
     } catch (err) {
@@ -500,15 +511,27 @@ const GestionPacientes = () => {
     }
   };
 
-  const eliminarSeleccionados = async () => {
+ const eliminarSeleccionados = async () => {
     if (seleccionados.length === 0) return;
-    if (!window.confirm(`¿Eliminar ${seleccionados.length} pacientes? Sus citas futuras también se eliminarán.`)) return;
+    if (!window.confirm(`¿Eliminar ${seleccionados.length} pacientes? Todos sus datos se eliminarán.`)) return;
     
     setEliminando(true);
     try {
-      const hoy = new Date().toISOString().split('T')[0];
       for (const id of seleccionados) {
-        await supabaseFetch(`citas?paciente_id=eq.${id}&fecha_cita=gte.${hoy}`, { method: 'DELETE' });
+        // 1. Items de reportes
+        const reportes = await supabaseFetch(`reportes_tratamiento?paciente_id=eq.${id}&select=id`);
+        if (reportes && reportes.length > 0) {
+          for (const r of reportes) {
+            await supabaseFetch(`reporte_items?reporte_id=eq.${r.id}`, { method: 'DELETE' });
+          }
+        }
+        // 2. Reportes
+        await supabaseFetch(`reportes_tratamiento?paciente_id=eq.${id}`, { method: 'DELETE' });
+        // 3. Planes
+        await supabaseFetch(`planes_tratamiento?paciente_id=eq.${id}`, { method: 'DELETE' });
+        // 4. Citas
+        await supabaseFetch(`citas?paciente_id=eq.${id}`, { method: 'DELETE' });
+        // 5. Paciente
         await supabaseFetch(`pacientes?id=eq.${id}`, { method: 'DELETE' });
       }
       setSeleccionados([]);
