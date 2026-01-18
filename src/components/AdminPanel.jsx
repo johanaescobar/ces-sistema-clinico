@@ -3,9 +3,235 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Clock, Calendar, AlertTriangle, BarChart3, 
   Plus, Trash2, Edit2, Save, X, RefreshCw, Loader2,
-  CheckCircle, XCircle, UserPlus, Settings, FileText
+  CheckCircle, XCircle, UserPlus, Settings, FileText,
+  ChevronDown, ChevronUp, Check
 } from 'lucide-react';
 import { SUPABASE_CONFIG } from '../config/api';
+
+// =============================================
+// HELPER: RENDERIZAR DETALLE DEL PLAN
+// =============================================
+const RenderPlanDetalle = ({ plan, tratamientosAprobados = [] }) => {
+  if (!plan) return <p className="text-gray-500">Sin plan de tratamiento</p>;
+
+  let planData;
+  try {
+    planData = typeof plan === 'string' ? JSON.parse(plan) : plan;
+  } catch {
+    return <p className="text-red-500">Error al parsear plan</p>;
+  }
+
+  // Verificar si un tratamiento está completado (TT aprobado)
+  const estaCompletado = (tipo, especificacion) => {
+    return tratamientosAprobados.some(t => 
+      t.tipo === tipo && 
+      t.especificacion === especificacion && 
+      t.estado === 'completo'
+    );
+  };
+
+  // Verificar si está en proceso (EP aprobado)
+  const estaEnProceso = (tipo, especificacion) => {
+    return tratamientosAprobados.some(t => 
+      t.tipo === tipo && 
+      t.especificacion === especificacion && 
+      t.estado === 'en_proceso'
+    );
+  };
+
+  const renderItem = (tipo, especificacion, texto, key) => {
+    const completado = estaCompletado(tipo, especificacion);
+    const enProceso = estaEnProceso(tipo, especificacion);
+
+    return (
+      <li key={key} className={`flex items-center gap-2 ${completado ? 'text-green-700' : enProceso ? 'text-amber-700' : 'text-gray-700'}`}>
+        {completado ? (
+          <Check size={14} className="text-green-600 flex-shrink-0" />
+        ) : enProceso ? (
+          <span className="w-3.5 h-3.5 border-2 border-amber-500 rounded-full flex-shrink-0"></span>
+        ) : (
+          <span className="w-3.5 h-3.5 border border-gray-300 rounded-full flex-shrink-0"></span>
+        )}
+        <span className={completado ? 'line-through' : ''}>{texto}</span>
+        {completado && <span className="text-xs bg-green-100 text-green-700 px-1 py-0.5 rounded">TT</span>}
+        {enProceso && <span className="text-xs bg-amber-100 text-amber-700 px-1 py-0.5 rounded">EP</span>}
+      </li>
+    );
+  };
+
+  const formatearDiente = (item) => {
+    if (typeof item === 'object' && item !== null) {
+      if (item.superficies) return `${item.diente} (${item.superficies})`;
+      if (item.superficie) return `${item.diente} (${item.superficie})`;
+      return item.diente;
+    }
+    return item;
+  };
+
+  return (
+    <div className="space-y-3 text-sm">
+      {/* Leyenda */}
+      <div className="flex gap-4 text-xs text-gray-500 border-b pb-2">
+        <span className="flex items-center gap-1"><Check size={12} className="text-green-600" /> TT = Terminado</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 border-2 border-amber-500 rounded-full"></span> EP = En Proceso</span>
+        <span className="flex items-center gap-1"><span className="w-3 h-3 border border-gray-300 rounded-full"></span> Pendiente</span>
+      </div>
+
+      {/* FASE HIGIÉNICA PERIODONTAL */}
+      {planData.fase_higienica_periodontal && (
+        <div>
+          <h5 className="font-semibold text-blue-800 mb-1 text-xs uppercase">Fase Higiénica Periodontal</h5>
+          <ul className="space-y-0.5 ml-2">
+            {planData.fase_higienica_periodontal.profilaxis === true && 
+              renderItem('Profilaxis', '', 'Profilaxis', 'profilaxis')}
+            {planData.fase_higienica_periodontal.detartraje?.generalizado === true && 
+              renderItem('Detartraje', 'Generalizado', 'Detartraje generalizado', 'detartraje-gen')}
+            {planData.fase_higienica_periodontal.detartraje?.dientes?.map((d, idx) =>
+              renderItem('Detartraje', `Diente ${d}`, `Detartraje: ${d}`, `detartraje-${idx}`)
+            )}
+            {planData.fase_higienica_periodontal.aplicacion_fluor?.map((d, idx) =>
+              renderItem('Aplicación Flúor', `Diente ${d}`, `Aplicación flúor: ${d}`, `fluor-${idx}`)
+            )}
+            {planData.fase_higienica_periodontal.pulido?.map((p, idx) => {
+              const diente = formatearDiente(p);
+              const esp = typeof p === 'object' ? `Diente ${p.diente}` : `Diente ${p}`;
+              return renderItem('Pulido', esp, `Pulido: ${diente}`, `pulido-${idx}`);
+            })}
+            {planData.fase_higienica_periodontal.raspaje_alisado_radicular?.map((d, idx) =>
+              renderItem('Raspaje y Alisado', `Diente ${d}`, `Raspaje y alisado: ${d}`, `raspaje-${idx}`)
+            )}
+          </ul>
+        </div>
+      )}
+
+      {/* FASE HIGIÉNICA DENTAL */}
+      {planData.fase_higienica_dental && (
+        <div>
+          <h5 className="font-semibold text-blue-800 mb-1 text-xs uppercase">Fase Higiénica Dental</h5>
+          <ul className="space-y-0.5 ml-2">
+            {planData.fase_higienica_dental.operatoria?.map((o, idx) => {
+              const diente = formatearDiente(o);
+              const esp = typeof o === 'object' ? `Diente ${o.diente}${o.superficies ? ` (${o.superficies})` : ''}` : `Diente ${o}`;
+              return renderItem('Operatoria', esp, `Operatoria: ${diente}`, `operatoria-${idx}`);
+            })}
+            {planData.fase_higienica_dental.exodoncias?.map((d, idx) =>
+              renderItem('Exodoncia', `Diente ${d}`, `Exodoncia: ${d}`, `exodoncia-${idx}`)
+            )}
+            {planData.fase_higienica_dental.retiro_coronas?.map((d, idx) =>
+              renderItem('Retiro Corona', `Diente ${d}`, `Retiro corona: ${d}`, `retiro-${idx}`)
+            )}
+            {planData.fase_higienica_dental.provisionales?.map((d, idx) =>
+              renderItem('Provisional', `Diente ${d}`, `Provisional: ${d}`, `provisional-${idx}`)
+            )}
+            {planData.fase_higienica_dental.rebase_provisionales?.map((d, idx) =>
+              renderItem('Rebase Provisional', `Diente ${d}`, `Rebase provisional: ${d}`, `rebase-prov-${idx}`)
+            )}
+            {planData.fase_higienica_dental.protesis_transicional?.superior === true &&
+              renderItem('Prótesis Transicional', 'Superior', 'Prótesis transicional superior', 'pt-sup')}
+            {planData.fase_higienica_dental.protesis_transicional?.inferior === true &&
+              renderItem('Prótesis Transicional', 'Inferior', 'Prótesis transicional inferior', 'pt-inf')}
+            {planData.fase_higienica_dental.rebase_protesis_transicional?.superior === true &&
+              renderItem('Rebase Prótesis Transicional', 'Superior', 'Rebase prótesis trans. superior', 'rpt-sup')}
+            {planData.fase_higienica_dental.rebase_protesis_transicional?.inferior === true &&
+              renderItem('Rebase Prótesis Transicional', 'Inferior', 'Rebase prótesis trans. inferior', 'rpt-inf')}
+          </ul>
+        </div>
+      )}
+
+      {/* FASE REEVALUATIVA */}
+      {planData.fase_reevaluativa === true && (
+        <div>
+          <h5 className="font-semibold text-blue-800 mb-1 text-xs uppercase">Fase Reevaluativa</h5>
+          <ul className="space-y-0.5 ml-2">
+            {renderItem('Reevaluación', '', 'Reevaluación', 'reevaluacion')}
+          </ul>
+        </div>
+      )}
+
+      {/* FASE CORRECTIVA INICIAL */}
+      {planData.fase_correctiva_inicial && (
+        <div>
+          <h5 className="font-semibold text-blue-800 mb-1 text-xs uppercase">Fase Correctiva Inicial</h5>
+          <ul className="space-y-0.5 ml-2">
+            {planData.fase_correctiva_inicial.endodoncia?.map((d, idx) =>
+              renderItem('Endodoncia', `Diente ${d}`, `Endodoncia: ${d}`, `endo-${idx}`)
+            )}
+            {planData.fase_correctiva_inicial.postes?.map((d, idx) =>
+              renderItem('Poste', `Diente ${d}`, `Poste: ${d}`, `poste-${idx}`)
+            )}
+            {planData.fase_correctiva_inicial.nucleos?.map((d, idx) =>
+              renderItem('Núcleo', `Diente ${d}`, `Núcleo: ${d}`, `nucleo-${idx}`)
+            )}
+            {planData.fase_correctiva_inicial.reconstruccion_munon?.map((d, idx) =>
+              renderItem('Reconstrucción Muñón', `Diente ${d}`, `Reconstrucción muñón: ${d}`, `munon-${idx}`)
+            )}
+            {planData.fase_correctiva_inicial.implantes_observacion?.map((d, idx) =>
+              renderItem('Implante', `Diente ${d}`, `Implante: ${d}`, `implante-${idx}`)
+            )}
+            {planData.fase_correctiva_inicial.cirugia_oral &&
+              renderItem('Cirugía Oral', planData.fase_correctiva_inicial.cirugia_oral, `Cirugía oral: ${planData.fase_correctiva_inicial.cirugia_oral}`, 'cirugia')}
+            {planData.fase_correctiva_inicial.ajuste_oclusal?.completo === true &&
+              renderItem('Ajuste Oclusal', 'Completo', 'Ajuste oclusal completo', 'ajuste-completo')}
+            {planData.fase_correctiva_inicial.ajuste_oclusal?.cuadrantes?.map((c, idx) =>
+              renderItem('Ajuste Oclusal', `Cuadrante ${c}`, `Ajuste oclusal: Cuadrante ${c}`, `ajuste-${idx}`)
+            )}
+          </ul>
+        </div>
+      )}
+
+      {/* FASE CORRECTIVA FINAL */}
+      {planData.fase_correctiva_final && (
+        <div>
+          <h5 className="font-semibold text-blue-800 mb-1 text-xs uppercase">Fase Correctiva Final</h5>
+          <ul className="space-y-0.5 ml-2">
+            {planData.fase_correctiva_final.coronas?.map((c, idx) => {
+              const diente = typeof c === 'object' ? c.diente : c;
+              const tipo = typeof c === 'object' && c.tipo ? ` (${c.tipo})` : '';
+              return renderItem('Corona', `Diente ${diente}${tipo}`, `Corona: ${diente}${tipo}`, `corona-${idx}`);
+            })}
+            {planData.fase_correctiva_final.incrustaciones?.map((i, idx) => {
+              const diente = typeof i === 'object' ? i.diente : i;
+              const detalles = [];
+              if (typeof i === 'object') {
+                if (i.tipo_pieza) detalles.push(i.tipo_pieza);
+                if (i.material) detalles.push(i.material);
+              }
+              const detalle = detalles.length > 0 ? ` (${detalles.join(', ')})` : '';
+              return renderItem('Incrustación', `Diente ${diente}${detalle}`, `Incrustación: ${diente}${detalle}`, `incrust-${idx}`);
+            })}
+            {planData.fase_correctiva_final.protesis_removible?.superior === true &&
+              renderItem('Prótesis Removible', 'Superior', 'Prótesis removible superior', 'ppr-sup')}
+            {planData.fase_correctiva_final.protesis_removible?.inferior === true &&
+              renderItem('Prótesis Removible', 'Inferior', 'Prótesis removible inferior', 'ppr-inf')}
+            {planData.fase_correctiva_final.protesis_total?.superior === true &&
+              renderItem('Prótesis Total', 'Superior', 'Prótesis total superior', 'pt-sup')}
+            {planData.fase_correctiva_final.protesis_total?.inferior === true &&
+              renderItem('Prótesis Total', 'Inferior', 'Prótesis total inferior', 'pt-inf')}
+            {planData.fase_correctiva_final.protesis_fija?.map((p, idx) => {
+              const tramo = typeof p === 'object' ? p.tramo : p;
+              const tipo = typeof p === 'object' && p.tipo ? ` (${p.tipo})` : '';
+              return renderItem('Prótesis Fija', `Tramo ${tramo}${tipo}`, `Prótesis fija: Tramo ${tramo}${tipo}`, `ppf-${idx}`);
+            })}
+            {planData.fase_correctiva_final.carillas?.map((c, idx) => {
+              const diente = typeof c === 'object' ? c.diente : c;
+              return renderItem('Carilla', `Diente ${diente}`, `Carilla: ${diente}`, `carilla-${idx}`);
+            })}
+          </ul>
+        </div>
+      )}
+
+      {/* FASE DE MANTENIMIENTO */}
+      {planData.fase_mantenimiento === true && (
+        <div>
+          <h5 className="font-semibold text-blue-800 mb-1 text-xs uppercase">Fase de Mantenimiento</h5>
+          <ul className="space-y-0.5 ml-2">
+            {renderItem('Mantenimiento', '', 'Mantenimiento', 'mantenimiento')}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Tabs del panel
 const TABS = [
@@ -321,6 +547,10 @@ const GestionPacientes = () => {
   });
   const [seleccionados, setSeleccionados] = useState([]);
   const [eliminando, setEliminando] = useState(false);
+  const [pacienteExpandido, setPacienteExpandido] = useState(null);
+  const [planExpandido, setPlanExpandido] = useState(null);
+  const [tratamientosAprobados, setTratamientosAprobados] = useState({});
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
 
   // Obtener usuario actual de sessionStorage
   const usuarioActual = JSON.parse(sessionStorage.getItem('usuario') || '{}');
@@ -354,7 +584,7 @@ const GestionPacientes = () => {
     setCargando(true);
     try {
       const [pacData, estData] = await Promise.all([
-        supabaseFetch('pacientes?select=*,usuarios!pacientes_estudiante_actual_id_fkey(nombre_completo)&order=created_at.desc'),
+        supabaseFetch('pacientes?select=*,usuarios!pacientes_estudiante_actual_id_fkey(nombre_completo),planes_tratamiento(id,plan_completo,estado,created_at,fecha_cierre,motivo_cierre)&order=created_at.desc'),
         supabaseFetch('usuarios?rol=eq.estudiante&activo=eq.true&select=id,nombre_completo')
       ]);
       setPacientes(pacData || []);
@@ -363,6 +593,72 @@ const GestionPacientes = () => {
       setError('Error al cargar pacientes');
     } finally {
       setCargando(false);
+    }
+  };
+
+  const cargarTratamientosAprobados = async (pacienteId) => {
+    if (tratamientosAprobados[pacienteId]) return;
+
+    setCargandoDetalle(true);
+    try {
+      const response = await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/reporte_items?estado_aprobacion=eq.aprobado&select=*,reportes_tratamiento!inner(paciente_id)&reportes_tratamiento.paciente_id=eq.${pacienteId}`,
+        {
+          headers: {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const aprobados = (data || []).map(item => ({
+          tipo: item.tipo_tratamiento,
+          especificacion: item.especificacion || '',
+          estado: item.estado_reportado
+        }));
+        setTratamientosAprobados(prev => ({ ...prev, [pacienteId]: aprobados }));
+      }
+    } catch (err) {
+      console.error('Error cargando tratamientos:', err);
+    } finally {
+      setCargandoDetalle(false);
+    }
+  };
+
+  const togglePaciente = async (pacienteId) => {
+    if (pacienteExpandido === pacienteId) {
+      setPacienteExpandido(null);
+      setPlanExpandido(null);
+    } else {
+      setPacienteExpandido(pacienteId);
+      setPlanExpandido(null);
+      await cargarTratamientosAprobados(pacienteId);
+    }
+  };
+
+  const togglePlan = (planId) => {
+    setPlanExpandido(planExpandido === planId ? null : planId);
+  };
+
+  const getEstadoPlanStyle = (estado) => {
+    switch (estado) {
+      case 'aprobado': return 'bg-green-100 text-green-700';
+      case 'pendiente_aprobacion': return 'bg-yellow-100 text-yellow-700';
+      case 'finalizado': return 'bg-blue-100 text-blue-700';
+      case 'abandonado': return 'bg-gray-100 text-gray-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const getEstadoPlanLabel = (estado) => {
+    switch (estado) {
+      case 'aprobado': return 'Activo';
+      case 'pendiente_aprobacion': return 'Pendiente';
+      case 'finalizado': return '✓ Finalizado';
+      case 'abandonado': return '✗ Abandonado';
+      default: return estado;
     }
   };
 
@@ -693,66 +989,140 @@ const GestionPacientes = () => {
         />
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="p-3 w-10">
+      <div className="space-y-2">
+        {/* Header */}
+        <div className="bg-gray-100 rounded-lg p-3 grid grid-cols-12 gap-2 text-sm font-semibold">
+          <div className="col-span-1 flex items-center">
+            <input
+              type="checkbox"
+              checked={seleccionados.length === pacientesFiltrados.length && pacientesFiltrados.length > 0}
+              onChange={toggleTodos}
+              className="w-4 h-4 cursor-pointer"
+            />
+          </div>
+          <div className="col-span-3">Paciente</div>
+          <div className="col-span-2">Cédula</div>
+          <div className="col-span-2">Teléfono</div>
+          <div className="col-span-3">Estudiante</div>
+          <div className="col-span-1 text-center">Acc.</div>
+        </div>
+
+        {/* Filas */}
+        {pacientesFiltrados.map((p) => (
+          <div key={p.id} className={`border rounded-lg ${seleccionados.includes(p.id) ? 'bg-red-50 border-red-200' : 'bg-white'}`}>
+            {/* Fila principal */}
+            <div 
+              className="p-3 grid grid-cols-12 gap-2 items-center cursor-pointer hover:bg-gray-50"
+              onClick={() => togglePaciente(p.id)}
+            >
+              <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
-                  checked={seleccionados.length === pacientesFiltrados.length && pacientesFiltrados.length > 0}
-                  onChange={toggleTodos}
+                  checked={seleccionados.includes(p.id)}
+                  onChange={() => toggleSeleccion(p.id)}
                   className="w-4 h-4 cursor-pointer"
                 />
-              </th>
-              <th className="text-left p-3 font-semibold">Paciente</th>
-              <th className="text-left p-3 font-semibold">Cédula</th>
-              <th className="text-left p-3 font-semibold">Teléfono</th>
-              <th className="text-left p-3 font-semibold">Estudiante Asignado</th>
-              <th className="text-left p-3 font-semibold">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pacientesFiltrados.map((p) => (
-              <tr key={p.id} className={`border-b hover:bg-gray-50 ${seleccionados.includes(p.id) ? 'bg-red-50' : ''}`}>
-                <td className="p-3">
-                  <input
-                    type="checkbox"
-                    checked={seleccionados.includes(p.id)}
-                    onChange={() => toggleSeleccion(p.id)}
-                    className="w-4 h-4 cursor-pointer"
-                  />
-                </td>
-                <td className="p-3">
+              </div>
+              <div className="col-span-3 flex items-center gap-2">
+                {pacienteExpandido === p.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                <span className="font-medium">
                   {p.primer_nombre} {p.segundo_nombre || ''} {p.primer_apellido} {p.segundo_apellido || ''}
-                </td>
-                <td className="p-3">{p.cedula}</td>
-                <td className="p-3">{formatearTelefono(p.celular)}</td>
-                <td className="p-3">
-                  <select
-                    value={p.estudiante_actual_id || ''}
-                    onChange={(e) => cambiarEstudiante(p.id, e.target.value)}
-                    className="border rounded px-2 py-1 text-sm w-full"
-                  >
-                    <option value="">Sin asignar</option>
-                    {estudiantes.map(e => (
-                      <option key={e.id} value={e.id}>{e.nombre_completo}</option>
+                </span>
+                {p.planes_tratamiento?.length > 0 && (
+                  <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+                    {p.planes_tratamiento.length} plan{p.planes_tratamiento.length > 1 ? 'es' : ''}
+                  </span>
+                )}
+              </div>
+              <div className="col-span-2 text-sm text-gray-600">{p.cedula}</div>
+              <div className="col-span-2 text-sm text-gray-600">{formatearTelefono(p.celular)}</div>
+              <div className="col-span-3" onClick={(e) => e.stopPropagation()}>
+                <select
+                  value={p.estudiante_actual_id || ''}
+                  onChange={(e) => cambiarEstudiante(p.id, e.target.value)}
+                  className="border rounded px-2 py-1 text-sm w-full"
+                >
+                  <option value="">Sin asignar</option>
+                  {estudiantes.map(e => (
+                    <option key={e.id} value={e.id}>{e.nombre_completo}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-1 text-center" onClick={(e) => e.stopPropagation()}>
+                <button
+                  onClick={() => eliminarPaciente(p.id)}
+                  className="text-red-600 hover:text-red-800"
+                  title="Eliminar paciente"
+                >
+                  <Trash2 size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Detalle expandido - Planes del paciente */}
+            {pacienteExpandido === p.id && (
+              <div className="border-t bg-purple-50 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText size={16} className="text-purple-600" />
+                  <span className="font-semibold text-purple-800">Planes de Tratamiento</span>
+                </div>
+
+                {(!p.planes_tratamiento || p.planes_tratamiento.length === 0) ? (
+                  <p className="text-gray-500 text-sm">Este paciente no tiene planes de tratamiento</p>
+                ) : (
+                  <div className="space-y-2">
+                    {p.planes_tratamiento.map((plan) => (
+                      <div key={plan.id} className="bg-white rounded-lg border">
+                        {/* Fila del plan */}
+                        <div 
+                          className="p-3 flex items-center justify-between cursor-pointer hover:bg-gray-50"
+                          onClick={() => togglePlan(plan.id)}
+                        >
+                          <div className="flex items-center gap-3">
+                            {planExpandido === plan.id ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${getEstadoPlanStyle(plan.estado)}`}>
+                              {getEstadoPlanLabel(plan.estado)}
+                            </span>
+                            <span className="text-sm text-gray-600">
+                              Creado: {new Date(plan.created_at).toLocaleDateString('es-CO')}
+                            </span>
+                            {plan.fecha_cierre && (
+                              <span className="text-xs text-gray-500">
+                                | Cerrado: {new Date(plan.fecha_cierre).toLocaleDateString('es-CO')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Detalle del plan expandido */}
+                        {planExpandido === plan.id && (
+                          <div className="border-t bg-blue-50 p-4">
+                            {cargandoDetalle ? (
+                              <div className="flex items-center gap-2 text-gray-500">
+                                <Loader2 size={16} className="animate-spin" />
+                                Cargando detalle...
+                              </div>
+                            ) : (
+                              <RenderPlanDetalle 
+                                plan={plan.plan_completo} 
+                                tratamientosAprobados={tratamientosAprobados[p.id] || []} 
+                              />
+                            )}
+                            {plan.motivo_cierre && (
+                              <div className="mt-3 p-2 bg-gray-100 rounded text-sm">
+                                <span className="font-medium">Motivo de cierre:</span> {plan.motivo_cierre}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     ))}
-                  </select>
-                </td>
-                <td className="p-3 text-center">
-                  <button
-                    onClick={() => eliminarPaciente(p.id)}
-                    className="text-red-600 hover:text-red-800"
-                    title="Eliminar paciente"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       {pacientesFiltrados.length === 0 && (
@@ -1134,12 +1504,15 @@ const GestionPlanes = () => {
   const [eliminando, setEliminando] = useState(false);
   const [abandonando, setAbandonando] = useState(null);
   const [motivoAbandono, setMotivoAbandono] = useState('');
+  const [planExpandido, setPlanExpandido] = useState(null);
+  const [tratamientosAprobados, setTratamientosAprobados] = useState({});
+  const [cargandoDetalle, setCargandoDetalle] = useState(false);
 
   const cargar = async () => {
     setCargando(true);
     try {
       const data = await supabaseFetch(
-        'planes_tratamiento?select=*,pacientes(primer_nombre,primer_apellido,cedula),usuarios:estudiante_id(nombre_completo)&order=created_at.desc'
+        'planes_tratamiento?select=*,pacientes(id,primer_nombre,primer_apellido,cedula),usuarios:estudiante_id(nombre_completo)&order=created_at.desc'
       );
       setPlanes(data || []);
     } catch (err) {
@@ -1150,6 +1523,46 @@ const GestionPlanes = () => {
   };
 
   useEffect(() => { cargar(); }, []);
+
+  const cargarTratamientosAprobados = async (pacienteId) => {
+    if (tratamientosAprobados[pacienteId]) return; // Ya cargado
+
+    setCargandoDetalle(true);
+    try {
+      const response = await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/reporte_items?estado_aprobacion=eq.aprobado&select=*,reportes_tratamiento!inner(paciente_id)&reportes_tratamiento.paciente_id=eq.${pacienteId}`,
+        {
+          headers: {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+          }
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const aprobados = (data || []).map(item => ({
+          tipo: item.tipo_tratamiento,
+          especificacion: item.especificacion || '',
+          estado: item.estado_reportado
+        }));
+        setTratamientosAprobados(prev => ({ ...prev, [pacienteId]: aprobados }));
+      }
+    } catch (err) {
+      console.error('Error cargando tratamientos:', err);
+    } finally {
+      setCargandoDetalle(false);
+    }
+  };
+
+  const toggleExpandir = async (planId, pacienteId) => {
+    if (planExpandido === planId) {
+      setPlanExpandido(null);
+    } else {
+      setPlanExpandido(planId);
+      await cargarTratamientosAprobados(pacienteId);
+    }
+  };
 
   const planesFiltrados = planes.filter(p => {
     const nombrePaciente = `${p.pacientes?.primer_nombre || ''} ${p.pacientes?.primer_apellido || ''}`.toLowerCase();
@@ -1309,84 +1722,104 @@ const GestionPlanes = () => {
         </div>
       )}
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="p-3 w-10">
+      <div className="space-y-2">
+        {/* Header */}
+        <div className="bg-gray-100 rounded-lg p-3 grid grid-cols-12 gap-2 text-sm font-semibold">
+          <div className="col-span-1 flex items-center">
+            <input
+              type="checkbox"
+              checked={seleccionados.length === planesFiltrados.length && planesFiltrados.length > 0}
+              onChange={toggleTodos}
+              className="w-4 h-4 cursor-pointer"
+            />
+          </div>
+          <div className="col-span-3">Paciente</div>
+          <div className="col-span-2">Cédula</div>
+          <div className="col-span-2">Estudiante</div>
+          <div className="col-span-2 text-center">Estado</div>
+          <div className="col-span-2 text-center">Acciones</div>
+        </div>
+
+        {/* Filas */}
+        {planesFiltrados.map((p) => (
+          <div key={p.id} className={`border rounded-lg ${seleccionados.includes(p.id) ? 'bg-red-50 border-red-200' : 'bg-white'}`}>
+            {/* Fila principal */}
+            <div 
+              className="p-3 grid grid-cols-12 gap-2 items-center cursor-pointer hover:bg-gray-50"
+              onClick={() => toggleExpandir(p.id, p.pacientes?.id)}
+            >
+              <div className="col-span-1" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
-                  checked={seleccionados.length === planesFiltrados.length && planesFiltrados.length > 0}
-                  onChange={toggleTodos}
+                  checked={seleccionados.includes(p.id)}
+                  onChange={() => toggleSeleccion(p.id)}
                   className="w-4 h-4 cursor-pointer"
                 />
-              </th>
-              <th className="text-left p-3 font-semibold">Paciente</th>
-              <th className="text-left p-3 font-semibold">Cédula</th>
-              <th className="text-left p-3 font-semibold">Estudiante</th>
-              <th className="text-center p-3 font-semibold">Estado</th>
-              <th className="text-left p-3 font-semibold">Fecha</th>
-              <th className="text-center p-3 font-semibold">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {planesFiltrados.map((p) => (
-              <tr key={p.id} className={`border-b hover:bg-gray-50 ${seleccionados.includes(p.id) ? 'bg-red-50' : ''}`}>
-                <td className="p-3">
-                  <input
-                    type="checkbox"
-                    checked={seleccionados.includes(p.id)}
-                    onChange={() => toggleSeleccion(p.id)}
-                    className="w-4 h-4 cursor-pointer"
-                  />
-                </td>
-                <td className="p-3">
-                  {p.pacientes?.primer_nombre} {p.pacientes?.primer_apellido}
-                </td>
-                <td className="p-3">{p.pacientes?.cedula}</td>
-                <td className="p-3 text-sm">{p.usuarios?.nombre_completo || '-'}</td>
-                <td className="p-3 text-center">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${getEstadoStyle(p.estado)}`}>
-                    {getEstadoLabel(p.estado)}
-                  </span>
-                  {p.motivo_cierre && (
-                    <div className="text-xs text-gray-500 mt-1" title={p.motivo_cierre}>
-                      {p.motivo_cierre.substring(0, 30)}{p.motivo_cierre.length > 30 ? '...' : ''}
-                    </div>
-                  )}
-                </td>
-                <td className="p-3 text-sm text-gray-500">
-                  {new Date(p.created_at).toLocaleDateString('es-CO')}
-                  {p.fecha_cierre && (
-                    <div className="text-xs">
-                      Cerrado: {new Date(p.fecha_cierre).toLocaleDateString('es-CO')}
-                    </div>
-                  )}
-                </td>
-                <td className="p-3 text-center">
-                  <div className="flex justify-center gap-2">
-                    {p.estado === 'aprobado' && (
-                      <button
-                        onClick={() => setAbandonando(p.id)}
-                        className="text-gray-600 hover:text-gray-800"
-                        title="Marcar como abandonado"
-                      >
-                        <XCircle size={18} />
-                      </button>
-                    )}
-                    <button
-                      onClick={() => eliminarPlan(p.id)}
-                      className="text-red-600 hover:text-red-800"
-                      title="Eliminar plan"
-                    >
-                      <Trash2 size={18} />
-                    </button>
+              </div>
+              <div className="col-span-3 flex items-center gap-2">
+                {planExpandido === p.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                <span className="font-medium">{p.pacientes?.primer_nombre} {p.pacientes?.primer_apellido}</span>
+              </div>
+              <div className="col-span-2 text-sm text-gray-600">{p.pacientes?.cedula}</div>
+              <div className="col-span-2 text-sm text-gray-600">{p.usuarios?.nombre_completo || '-'}</div>
+              <div className="col-span-2 text-center">
+                <span className={`px-2 py-1 rounded text-xs font-medium ${getEstadoStyle(p.estado)}`}>
+                  {getEstadoLabel(p.estado)}
+                </span>
+                {p.motivo_cierre && (
+                  <div className="text-xs text-gray-500 mt-1" title={p.motivo_cierre}>
+                    {p.motivo_cierre.substring(0, 20)}...
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                )}
+              </div>
+              <div className="col-span-2 text-center" onClick={(e) => e.stopPropagation()}>
+                <div className="flex justify-center gap-2">
+                  {p.estado === 'aprobado' && (
+                    <button
+                      onClick={() => setAbandonando(p.id)}
+                      className="text-gray-600 hover:text-gray-800"
+                      title="Marcar como abandonado"
+                    >
+                      <XCircle size={18} />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => eliminarPlan(p.id)}
+                    className="text-red-600 hover:text-red-800"
+                    title="Eliminar plan"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Detalle expandido */}
+            {planExpandido === p.id && (
+              <div className="border-t bg-blue-50 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <FileText size={16} className="text-blue-600" />
+                  <span className="font-semibold text-blue-800">Detalle del Plan de Tratamiento</span>
+                  <span className="text-xs text-gray-500">
+                    Creado: {new Date(p.created_at).toLocaleDateString('es-CO')}
+                    {p.fecha_cierre && ` | Cerrado: ${new Date(p.fecha_cierre).toLocaleDateString('es-CO')}`}
+                  </span>
+                </div>
+                {cargandoDetalle ? (
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Loader2 size={16} className="animate-spin" />
+                    Cargando detalle...
+                  </div>
+                ) : (
+                  <RenderPlanDetalle 
+                    plan={p.plan_completo} 
+                    tratamientosAprobados={tratamientosAprobados[p.pacientes?.id] || []} 
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        ))}
       </div>
 
       {planesFiltrados.length === 0 && (

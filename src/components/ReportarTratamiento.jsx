@@ -191,7 +191,6 @@ const ReportarTratamiento = () => {
       
       // Prótesis transicional - objeto {superior, inferior, dientes_reemplazar}
       if (fhd.protesis_transicional?.superior === true) {
-        const dientes = fhd.protesis_transicional.dientes_reemplazar?.join(', ') || '';
         tratamientos.push({ id: id++, tipo: 'Prótesis Transicional', especificacion: 'Superior', fase: 'Fase Higiénica Dental' });
       }
       if (fhd.protesis_transicional?.inferior === true) {
