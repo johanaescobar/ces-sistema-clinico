@@ -1512,7 +1512,7 @@ const GestionPlanes = () => {
     setCargando(true);
     try {
       const data = await supabaseFetch(
-        'planes_tratamiento?select=*,pacientes(id,primer_nombre,primer_apellido,cedula),usuarios:estudiante_id(nombre_completo)&order=created_at.desc'
+        'planes_tratamiento?select=*,pacientes(id,primer_nombre,primer_apellido,cedula)&order=created_at.desc'
       );
       setPlanes(data || []);
     } catch (err) {
@@ -1761,7 +1761,7 @@ const GestionPlanes = () => {
                 <span className="font-medium">{p.pacientes?.primer_nombre} {p.pacientes?.primer_apellido}</span>
               </div>
               <div className="col-span-2 text-sm text-gray-600">{p.pacientes?.cedula}</div>
-              <div className="col-span-2 text-sm text-gray-600">{p.usuarios?.nombre_completo || '-'}</div>
+              <div className="col-span-2 text-sm text-gray-600">-</div>
               <div className="col-span-2 text-center">
                 <span className={`px-2 py-1 rounded text-xs font-medium ${getEstadoStyle(p.estado)}`}>
                   {getEstadoLabel(p.estado)}
