@@ -16,6 +16,8 @@ const Dashboard = () => {
 
   const usuario = JSON.parse(sessionStorage.getItem('usuario') || '{}');
 
+  const N8N_MODIFICAR_PLAN_URL = 'https://brainlogic.ddnsfree.com/webhook/ces-modificar-plan';
+
   const cargarReportes = async () => {
     setCargando(true);
     setError(null);
@@ -66,9 +68,9 @@ const Dashboard = () => {
 
       setReportes(Object.values(reportesAgrupados));
 
-      // Cargar modificaciones de plan pendientes
+      // Cargar modificaciones de plan pendientes con datos del plan
       const responseMod = await fetch(
-        `${SUPABASE_CONFIG.URL}/rest/v1/modificaciones_plan?estado=eq.pendiente&select=*,pacientes(primer_nombre,primer_apellido,cedula),usuarios:estudiante_id(nombre_completo,correo)`,
+        `${SUPABASE_CONFIG.URL}/rest/v1/modificaciones_plan?estado=eq.pendiente&select=*,pacientes(primer_nombre,primer_apellido,cedula),usuarios:estudiante_id(nombre_completo,correo),planes_tratamiento:plan_id(id,plan_completo)`,
         {
           headers: {
             'apikey': SUPABASE_CONFIG.ANON_KEY,
@@ -173,12 +175,53 @@ const Dashboard = () => {
     }
   };
 
-  const aprobarModificacion = async (modId) => {
-    setProcesando(`mod-${modId}`);
+  const aprobarModificacion = async (mod) => {
+    setProcesando(`mod-${mod.id}`);
 
     try {
+      // Obtener el plan actual
+      const planActual = mod.planes_tratamiento?.plan_completo;
+      const planId = mod.plan_id;
+
+      if (!planActual || !planId) {
+        alert('Error: No se encontró el plan de tratamiento');
+        setProcesando(null);
+        return;
+      }
+
+      // Llamar al webhook de n8n para procesar la modificación con LLM
+      const n8nResponse = await fetch(N8N_MODIFICAR_PLAN_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          plan_id: planId,
+          plan_actual: typeof planActual === 'string' ? planActual : JSON.stringify(planActual),
+          modificacion: mod.descripcion_cambio,
+          tipo_modificacion: mod.tipo_modificacion
+        })
+      });
+
+      if (!n8nResponse.ok) {
+        const errorText = await n8nResponse.text();
+        console.error('Error n8n:', errorText);
+        alert('Error al procesar la modificación. Por favor intenta de nuevo.');
+        setProcesando(null);
+        return;
+      }
+
+      const resultado = await n8nResponse.json();
+
+      if (resultado.error) {
+        alert('Error del LLM: ' + resultado.error);
+        setProcesando(null);
+        return;
+      }
+
+      // El plan ya fue actualizado por n8n, solo marcamos la modificación como aprobada
       const response = await fetch(
-        `${SUPABASE_CONFIG.URL}/rest/v1/modificaciones_plan?id=eq.${modId}`,
+        `${SUPABASE_CONFIG.URL}/rest/v1/modificaciones_plan?id=eq.${mod.id}`,
         {
           method: 'PATCH',
           headers: {
@@ -189,18 +232,21 @@ const Dashboard = () => {
           body: JSON.stringify({
             estado: 'aprobado',
             revisado_por: usuario.id,
-            fecha_revision: new Date().toISOString()
+            fecha_revision: new Date().toISOString(),
+            cambio_procesado: resultado.plan_actualizado ? JSON.stringify(resultado.cambios_aplicados || {}) : null
           })
         }
       );
 
       if (response.ok) {
-        setModificaciones(prev => prev.filter(m => m.id !== modId));
+        setModificaciones(prev => prev.filter(m => m.id !== mod.id));
+        alert('✅ Modificación aprobada y plan actualizado');
       } else {
-        alert('Error al aprobar modificación');
+        alert('La modificación fue procesada pero hubo un error al actualizar el estado');
       }
     } catch (err) {
-      alert('Error de conexión');
+      console.error('Error:', err);
+      alert('Error de conexión al procesar la modificación');
     } finally {
       setProcesando(null);
     }
@@ -387,7 +433,7 @@ const Dashboard = () => {
                     ) : (
                       <>
                         <button
-                          onClick={() => aprobarModificacion(mod.id)}
+                          onClick={() => aprobarModificacion(mod)}
                           disabled={procesando === `mod-${mod.id}`}
                           className="flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-300 transition"
                         >
