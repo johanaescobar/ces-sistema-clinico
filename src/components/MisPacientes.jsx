@@ -29,7 +29,7 @@ const MisPacientes = () => {
       setCargando(true);
       
       const response = await fetch(
-        `${SUPABASE_CONFIG.URL}/rest/v1/pacientes?estudiante_actual_id=eq.${usuario.id}&select=*,planes_tratamiento(*)&order=primer_apellido.asc,primer_nombre.asc`,
+        `${SUPABASE_CONFIG.URL}/rest/v1/pacientes?estudiante_actual_id=eq.${usuario.id}&select=*,planes_tratamiento(*)&order=primer_nombre.asc,primer_apellido.asc`,
         {
           headers: {
             'apikey': SUPABASE_CONFIG.ANON_KEY,

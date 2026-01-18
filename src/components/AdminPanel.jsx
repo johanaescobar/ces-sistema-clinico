@@ -354,8 +354,8 @@ const GestionPacientes = () => {
     setCargando(true);
     try {
       const [pacData, estData] = await Promise.all([
-        supabaseFetch('pacientes?select=*,usuarios!pacientes_estudiante_actual_id_fkey(nombre_completo)&order=created_at.desc'),
-        supabaseFetch('usuarios?rol=eq.estudiante&activo=eq.true&select=id,nombre_completo')
+        supabaseFetch('pacientes?select=*,usuarios!pacientes_estudiante_actual_id_fkey(nombre_completo)&order=primer_nombre.asc,primer_apellido.asc'),
+        supabaseFetch('usuarios?rol=eq.estudiante&activo=eq.true&select=id,nombre_completo&order=nombre_completo.asc')
       ]);
       setPacientes(pacData || []);
       setEstudiantes(estData || []);
