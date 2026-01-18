@@ -133,14 +133,15 @@ const Dashboard = () => {
 
       // Si todos los tratamientos están completos, finalizar el plan
       if (totalTTAprobados >= totalTratamientos && totalTratamientos > 0) {
-        await fetch(
+        const updateResponse = await fetch(
           `${SUPABASE_CONFIG.URL}/rest/v1/planes_tratamiento?id=eq.${plan.id}`,
           {
             method: 'PATCH',
             headers: {
               'apikey': SUPABASE_CONFIG.ANON_KEY,
               'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal'
             },
             body: JSON.stringify({
               estado: 'finalizado',
@@ -150,7 +151,13 @@ const Dashboard = () => {
           }
         );
 
-        alert('🎉 ¡Plan de tratamiento FINALIZADO! Todos los tratamientos han sido completados.');
+        if (updateResponse.ok) {
+          alert('🎉 ¡Plan de tratamiento FINALIZADO! Todos los tratamientos han sido completados.');
+        } else {
+          const errorText = await updateResponse.text();
+          console.error('Error finalizando plan:', errorText);
+          alert('Error al finalizar el plan. Revisa la consola.');
+        }
       }
     } catch (err) {
       console.error('Error verificando finalización:', err);
