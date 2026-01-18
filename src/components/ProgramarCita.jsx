@@ -220,7 +220,7 @@ const formatearTelefono = (tel) => {
     
     // Extraer tratamientos pendientes del plan activo
     const planes = Array.isArray(paciente.planes_tratamiento) ? paciente.planes_tratamiento : [];
-    const planActivo = planes.find(p => !p.fecha_finalizacion);
+    const planActivo = planes.find(p => p.estado === 'aprobado');
     if (planActivo?.plan_completo) {
       const plan = typeof planActivo.plan_completo === 'string' 
         ? JSON.parse(planActivo.plan_completo) 

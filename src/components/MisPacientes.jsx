@@ -619,7 +619,7 @@ const MisPacientes = () => {
                           {planes.map((plan) => {
                             const esPlanExpandido = planExpandido === plan.id;
                             const planFormateado = formatearPlan(plan.plan_completo);
-                            const esActivo = plan.estado === 'aprobado' && !plan.fecha_finalizacion;
+                            const esActivo = plan.estado === 'aprobado';
 
                             return (
                               <div key={plan.id} className="border rounded-lg overflow-hidden">
@@ -639,8 +639,11 @@ const MisPacientes = () => {
                                       {esActivo && (
                                         <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">Activo</span>
                                       )}
-                                      {plan.fecha_finalizacion && (
-                                        <span className="text-xs bg-gray-500 text-white px-2 py-0.5 rounded">Finalizado</span>
+                                      {plan.estado === 'finalizado' && (
+                                        <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded">✓ Finalizado</span>
+                                      )}
+                                      {plan.estado === 'abandonado' && (
+                                        <span className="text-xs bg-gray-500 text-white px-2 py-0.5 rounded">✗ Abandonado</span>
                                       )}
                                     </div>
                                     <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
@@ -648,10 +651,10 @@ const MisPacientes = () => {
                                         <Calendar size={12} />
                                         Inicio: {formatearFecha(plan.created_at)}
                                       </span>
-                                      {plan.fecha_finalizacion && (
+                                      {plan.fecha_cierre && (
                                         <span className="flex items-center gap-1">
                                           <Clock size={12} />
-                                          Fin: {formatearFecha(plan.fecha_finalizacion)}
+                                          {plan.estado === 'abandonado' ? 'Abandonado' : 'Fin'}: {formatearFecha(plan.fecha_cierre)}
                                         </span>
                                       )}
                                     </div>
