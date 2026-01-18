@@ -109,27 +109,40 @@ const ReportarTratamiento = () => {
 
     // Fase higiénica periodontal
     if (plan.fase_higienica_periodontal) {
-      if (plan.fase_higienica_periodontal.profilaxis) {
+      const fhp = plan.fase_higienica_periodontal;
+      
+      if (fhp.profilaxis === true) {
         tratamientos.push({ id: id++, tipo: 'Profilaxis', especificacion: '', fase: 'Fase Higiénica Periodontal' });
       }
-      if (plan.fase_higienica_periodontal.detartraje?.generalizado) {
+      
+      if (fhp.detartraje?.generalizado === true) {
         tratamientos.push({ id: id++, tipo: 'Detartraje', especificacion: 'Generalizado', fase: 'Fase Higiénica Periodontal' });
       }
-      if (plan.fase_higienica_periodontal.detartraje?.dientes?.length > 0) {
-        plan.fase_higienica_periodontal.detartraje.dientes.forEach(d => {
+      if (fhp.detartraje?.dientes?.length > 0) {
+        fhp.detartraje.dientes.forEach(d => {
           tratamientos.push({ id: id++, tipo: 'Detartraje', especificacion: `Diente ${d}`, fase: 'Fase Higiénica Periodontal' });
         });
       }
-      if (plan.fase_higienica_periodontal.pulido_coronal?.generalizado) {
-        tratamientos.push({ id: id++, tipo: 'Pulido Coronal', especificacion: 'Generalizado', fase: 'Fase Higiénica Periodontal' });
-      }
-      if (plan.fase_higienica_periodontal.pulido_coronal?.dientes?.length > 0) {
-        plan.fase_higienica_periodontal.pulido_coronal.dientes.forEach(d => {
-          tratamientos.push({ id: id++, tipo: 'Pulido Coronal', especificacion: `Diente ${d}`, fase: 'Fase Higiénica Periodontal' });
+      
+      // Aplicación flúor - array directo de números
+      if (fhp.aplicacion_fluor?.length > 0) {
+        fhp.aplicacion_fluor.forEach(d => {
+          tratamientos.push({ id: id++, tipo: 'Aplicación Flúor', especificacion: `Diente ${d}`, fase: 'Fase Higiénica Periodontal' });
         });
       }
-      if (plan.fase_higienica_periodontal.raspaje_alisado_radicular?.dientes?.length > 0) {
-        plan.fase_higienica_periodontal.raspaje_alisado_radicular.dientes.forEach(d => {
+      
+      // Pulido - array de objetos {diente, superficies}
+      if (fhp.pulido?.length > 0) {
+        fhp.pulido.forEach(p => {
+          const diente = typeof p === 'object' ? p.diente : p;
+          const sup = typeof p === 'object' && p.superficies ? ` (${p.superficies})` : '';
+          tratamientos.push({ id: id++, tipo: 'Pulido', especificacion: `Diente ${diente}${sup}`, fase: 'Fase Higiénica Periodontal' });
+        });
+      }
+      
+      // Raspaje y alisado radicular - array directo de números
+      if (fhp.raspaje_alisado_radicular?.length > 0) {
+        fhp.raspaje_alisado_radicular.forEach(d => {
           tratamientos.push({ id: id++, tipo: 'Raspaje y Alisado', especificacion: `Diente ${d}`, fase: 'Fase Higiénica Periodontal' });
         });
       }
@@ -137,77 +150,186 @@ const ReportarTratamiento = () => {
 
     // Fase higiénica dental
     if (plan.fase_higienica_dental) {
-      if (plan.fase_higienica_dental.operatoria?.dientes?.length > 0) {
-        plan.fase_higienica_dental.operatoria.dientes.forEach(d => {
-          tratamientos.push({ id: id++, tipo: 'Operatoria', especificacion: `Diente ${d}`, fase: 'Fase Higiénica Dental' });
+      const fhd = plan.fase_higienica_dental;
+      
+      // Operatoria - array de objetos {diente, superficies}
+      if (fhd.operatoria?.length > 0) {
+        fhd.operatoria.forEach(o => {
+          const diente = typeof o === 'object' ? o.diente : o;
+          const sup = typeof o === 'object' && o.superficies ? ` (${o.superficies})` : '';
+          tratamientos.push({ id: id++, tipo: 'Operatoria', especificacion: `Diente ${diente}${sup}`, fase: 'Fase Higiénica Dental' });
         });
       }
-      if (plan.fase_higienica_dental.exodoncias?.length > 0) {
-        plan.fase_higienica_dental.exodoncias.forEach(d => {
+      
+      // Exodoncias - array directo de números
+      if (fhd.exodoncias?.length > 0) {
+        fhd.exodoncias.forEach(d => {
           tratamientos.push({ id: id++, tipo: 'Exodoncia', especificacion: `Diente ${d}`, fase: 'Fase Higiénica Dental' });
         });
       }
-      if (plan.fase_higienica_dental.provisionales?.dientes?.length > 0) {
-        plan.fase_higienica_dental.provisionales.dientes.forEach(d => {
+      
+      // Retiro coronas - array directo de números
+      if (fhd.retiro_coronas?.length > 0) {
+        fhd.retiro_coronas.forEach(d => {
+          tratamientos.push({ id: id++, tipo: 'Retiro Corona', especificacion: `Diente ${d}`, fase: 'Fase Higiénica Dental' });
+        });
+      }
+      
+      // Provisionales - array directo de números
+      if (fhd.provisionales?.length > 0) {
+        fhd.provisionales.forEach(d => {
           tratamientos.push({ id: id++, tipo: 'Provisional', especificacion: `Diente ${d}`, fase: 'Fase Higiénica Dental' });
         });
+      }
+      
+      // Rebase provisionales - array directo de números
+      if (fhd.rebase_provisionales?.length > 0) {
+        fhd.rebase_provisionales.forEach(d => {
+          tratamientos.push({ id: id++, tipo: 'Rebase Provisional', especificacion: `Diente ${d}`, fase: 'Fase Higiénica Dental' });
+        });
+      }
+      
+      // Prótesis transicional - objeto {superior, inferior, dientes_reemplazar}
+      if (fhd.protesis_transicional?.superior === true) {
+        const dientes = fhd.protesis_transicional.dientes_reemplazar?.join(', ') || '';
+        tratamientos.push({ id: id++, tipo: 'Prótesis Transicional', especificacion: 'Superior', fase: 'Fase Higiénica Dental' });
+      }
+      if (fhd.protesis_transicional?.inferior === true) {
+        tratamientos.push({ id: id++, tipo: 'Prótesis Transicional', especificacion: 'Inferior', fase: 'Fase Higiénica Dental' });
+      }
+      
+      // Rebase prótesis transicional - objeto {superior, inferior}
+      if (fhd.rebase_protesis_transicional?.superior === true) {
+        tratamientos.push({ id: id++, tipo: 'Rebase Prótesis Transicional', especificacion: 'Superior', fase: 'Fase Higiénica Dental' });
+      }
+      if (fhd.rebase_protesis_transicional?.inferior === true) {
+        tratamientos.push({ id: id++, tipo: 'Rebase Prótesis Transicional', especificacion: 'Inferior', fase: 'Fase Higiénica Dental' });
       }
     }
 
     // Fase reevaluativa
-    if (plan.fase_reevaluativa) {
+    if (plan.fase_reevaluativa === true) {
       tratamientos.push({ id: id++, tipo: 'Reevaluación', especificacion: '', fase: 'Fase Reevaluativa' });
     }
 
     // Fase correctiva inicial
     if (plan.fase_correctiva_inicial) {
-      if (plan.fase_correctiva_inicial.endodoncia?.length > 0) {
-        plan.fase_correctiva_inicial.endodoncia.forEach(d => {
+      const fci = plan.fase_correctiva_inicial;
+      
+      // Endodoncia - array directo de números
+      if (fci.endodoncia?.length > 0) {
+        fci.endodoncia.forEach(d => {
           tratamientos.push({ id: id++, tipo: 'Endodoncia', especificacion: `Diente ${d}`, fase: 'Fase Correctiva Inicial' });
         });
       }
-      if (plan.fase_correctiva_inicial.postes?.length > 0) {
-        plan.fase_correctiva_inicial.postes.forEach(d => {
+      
+      // Postes - array directo de números
+      if (fci.postes?.length > 0) {
+        fci.postes.forEach(d => {
           tratamientos.push({ id: id++, tipo: 'Poste', especificacion: `Diente ${d}`, fase: 'Fase Correctiva Inicial' });
         });
       }
-      if (plan.fase_correctiva_inicial.nucleos?.length > 0) {
-        plan.fase_correctiva_inicial.nucleos.forEach(d => {
+      
+      // Núcleos - array directo de números
+      if (fci.nucleos?.length > 0) {
+        fci.nucleos.forEach(d => {
           tratamientos.push({ id: id++, tipo: 'Núcleo', especificacion: `Diente ${d}`, fase: 'Fase Correctiva Inicial' });
         });
       }
-      if (plan.fase_correctiva_inicial.reconstruccion_munon?.length > 0) {
-        plan.fase_correctiva_inicial.reconstruccion_munon.forEach(d => {
+      
+      // Reconstrucción muñón - array directo de números
+      if (fci.reconstruccion_munon?.length > 0) {
+        fci.reconstruccion_munon.forEach(d => {
           tratamientos.push({ id: id++, tipo: 'Reconstrucción Muñón', especificacion: `Diente ${d}`, fase: 'Fase Correctiva Inicial' });
+        });
+      }
+      
+      // Implantes - array directo de números
+      if (fci.implantes_observacion?.length > 0) {
+        fci.implantes_observacion.forEach(d => {
+          tratamientos.push({ id: id++, tipo: 'Implante', especificacion: `Diente ${d}`, fase: 'Fase Correctiva Inicial' });
+        });
+      }
+      
+      // Cirugía oral
+      if (fci.cirugia_oral) {
+        tratamientos.push({ id: id++, tipo: 'Cirugía Oral', especificacion: fci.cirugia_oral, fase: 'Fase Correctiva Inicial' });
+      }
+      
+      // Ajuste oclusal
+      if (fci.ajuste_oclusal?.completo === true) {
+        tratamientos.push({ id: id++, tipo: 'Ajuste Oclusal', especificacion: 'Completo', fase: 'Fase Correctiva Inicial' });
+      }
+      if (fci.ajuste_oclusal?.cuadrantes?.length > 0) {
+        fci.ajuste_oclusal.cuadrantes.forEach(c => {
+          tratamientos.push({ id: id++, tipo: 'Ajuste Oclusal', especificacion: `Cuadrante ${c}`, fase: 'Fase Correctiva Inicial' });
         });
       }
     }
 
     // Fase correctiva final
     if (plan.fase_correctiva_final) {
-      if (plan.fase_correctiva_final.coronas?.length > 0) {
-        plan.fase_correctiva_final.coronas.forEach(d => {
-          tratamientos.push({ id: id++, tipo: 'Corona', especificacion: `Diente ${d}`, fase: 'Fase Correctiva Final' });
+      const fcf = plan.fase_correctiva_final;
+      
+      // Coronas - array de objetos {diente, tipo}
+      if (fcf.coronas?.length > 0) {
+        fcf.coronas.forEach(c => {
+          const diente = typeof c === 'object' ? c.diente : c;
+          const tipo = typeof c === 'object' && c.tipo ? ` (${c.tipo})` : '';
+          tratamientos.push({ id: id++, tipo: 'Corona', especificacion: `Diente ${diente}${tipo}`, fase: 'Fase Correctiva Final' });
         });
       }
-      if (plan.fase_correctiva_final.incrustaciones?.length > 0) {
-        plan.fase_correctiva_final.incrustaciones.forEach(i => {
-          const esp = typeof i === 'object' 
-            ? `Diente ${i.diente}${i.tipo ? ` (${i.tipo})` : ''}` 
-            : `Diente ${i}`;
-          tratamientos.push({ id: id++, tipo: 'Incrustación', especificacion: esp, fase: 'Fase Correctiva Final' });
+      
+      // Incrustaciones - array de objetos {diente, tipo_pieza, material}
+      if (fcf.incrustaciones?.length > 0) {
+        fcf.incrustaciones.forEach(i => {
+          const diente = typeof i === 'object' ? i.diente : i;
+          const detalles = [];
+          if (typeof i === 'object') {
+            if (i.tipo_pieza) detalles.push(i.tipo_pieza);
+            if (i.material) detalles.push(i.material);
+          }
+          const detalle = detalles.length > 0 ? ` (${detalles.join(', ')})` : '';
+          tratamientos.push({ id: id++, tipo: 'Incrustación', especificacion: `Diente ${diente}${detalle}`, fase: 'Fase Correctiva Final' });
         });
       }
-      if (plan.fase_correctiva_final.protesis_removible) {
-        tratamientos.push({ id: id++, tipo: 'Prótesis Removible', especificacion: '', fase: 'Fase Correctiva Final' });
+      
+      // Prótesis Removible - objeto {superior, inferior}
+      if (fcf.protesis_removible?.superior === true) {
+        tratamientos.push({ id: id++, tipo: 'Prótesis Removible', especificacion: 'Superior', fase: 'Fase Correctiva Final' });
       }
-      if (plan.fase_correctiva_final.protesis_total) {
-        tratamientos.push({ id: id++, tipo: 'Prótesis Total', especificacion: '', fase: 'Fase Correctiva Final' });
+      if (fcf.protesis_removible?.inferior === true) {
+        tratamientos.push({ id: id++, tipo: 'Prótesis Removible', especificacion: 'Inferior', fase: 'Fase Correctiva Final' });
+      }
+      
+      // Prótesis Total - objeto {superior, inferior}
+      if (fcf.protesis_total?.superior === true) {
+        tratamientos.push({ id: id++, tipo: 'Prótesis Total', especificacion: 'Superior', fase: 'Fase Correctiva Final' });
+      }
+      if (fcf.protesis_total?.inferior === true) {
+        tratamientos.push({ id: id++, tipo: 'Prótesis Total', especificacion: 'Inferior', fase: 'Fase Correctiva Final' });
+      }
+      
+      // Prótesis Fija - array de objetos
+      if (fcf.protesis_fija?.length > 0) {
+        fcf.protesis_fija.forEach(p => {
+          const tramo = typeof p === 'object' ? p.tramo : p;
+          const tipo = typeof p === 'object' && p.tipo ? ` (${p.tipo})` : '';
+          tratamientos.push({ id: id++, tipo: 'Prótesis Fija', especificacion: `Tramo ${tramo}${tipo}`, fase: 'Fase Correctiva Final' });
+        });
+      }
+      
+      // Carillas - array de objetos o números
+      if (fcf.carillas?.length > 0) {
+        fcf.carillas.forEach(c => {
+          const diente = typeof c === 'object' ? c.diente : c;
+          tratamientos.push({ id: id++, tipo: 'Carilla', especificacion: `Diente ${diente}`, fase: 'Fase Correctiva Final' });
+        });
       }
     }
 
     // Fase mantenimiento
-    if (plan.fase_mantenimiento) {
+    if (plan.fase_mantenimiento === true) {
       tratamientos.push({ id: id++, tipo: 'Mantenimiento', especificacion: '', fase: 'Fase de Mantenimiento' });
     }
 
