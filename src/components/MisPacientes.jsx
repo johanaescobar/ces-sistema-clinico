@@ -244,19 +244,43 @@ const MisPacientes = () => {
 
   // Formatear diente con superficie
   const formatearDienteConSuperficie = (item) => {
-    if (typeof item === 'object') {
+    if (typeof item === 'object' && item !== null) {
+      if (item.superficies) {
+        return `${item.diente} (${item.superficies})`;
+      }
       if (item.superficie) {
-        return `${item.diente} ${item.superficie}`;
+        return `${item.diente} (${item.superficie})`;
       }
       return item.diente;
     }
     return item;
   };
 
-  // Formatear corona/incrustación con tipo
-  const formatearConTipo = (item) => {
-    if (typeof item === 'object') {
+  // Formatear corona con tipo
+  const formatearCorona = (item) => {
+    if (typeof item === 'object' && item !== null) {
       return `${item.diente}${item.tipo ? ` (${item.tipo})` : ''}`;
+    }
+    return item;
+  };
+
+  // Formatear incrustación con tipo_pieza y material
+  const formatearIncrustacion = (item) => {
+    if (typeof item === 'object' && item !== null) {
+      let texto = `${item.diente}`;
+      const detalles = [];
+      if (item.tipo_pieza) detalles.push(item.tipo_pieza);
+      if (item.material) detalles.push(item.material);
+      if (detalles.length > 0) texto += ` (${detalles.join(', ')})`;
+      return texto;
+    }
+    return item;
+  };
+
+  // Formatear prótesis fija
+  const formatearProtesisFija = (item) => {
+    if (typeof item === 'object' && item !== null) {
+      return `Tramo ${item.tramo}${item.tipo ? ` (${item.tipo})` : ''}`;
     }
     return item;
   };
@@ -273,27 +297,39 @@ const MisPacientes = () => {
           <span className="flex items-center gap-1"><span className="w-3 h-3 border border-gray-300 rounded-full"></span> Pendiente</span>
         </div>
 
+        {/* FASE HIGIÉNICA PERIODONTAL */}
         {plan.fase_higienica_periodontal && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Higiénica Periodontal</h5>
             <ul className="space-y-1">
               {plan.fase_higienica_periodontal.profilaxis && 
                 renderItem(pacienteId, 'Profilaxis', '', 'Profilaxis', 'profilaxis')}
+              
               {plan.fase_higienica_periodontal.detartraje?.generalizado && 
                 renderItem(pacienteId, 'Detartraje', 'Generalizado', 'Detartraje generalizado', 'detartraje-gen')}
+              
               {plan.fase_higienica_periodontal.detartraje?.dientes?.map((d, idx) => {
                 const diente = formatearDienteConSuperficie(d);
                 const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
                 return renderItem(pacienteId, 'Detartraje', especificacion, `Detartraje: ${diente}`, `detartraje-${idx}`);
               })}
-              {plan.fase_higienica_periodontal.pulido_coronal?.generalizado && 
-                renderItem(pacienteId, 'Pulido Coronal', 'Generalizado', 'Pulido coronal generalizado', 'pulido-gen')}
-              {plan.fase_higienica_periodontal.pulido_coronal?.dientes?.map((d, idx) => {
+              
+              {/* Aplicación de Flúor */}
+              {plan.fase_higienica_periodontal.aplicacion_fluor?.map((d, idx) => {
                 const diente = formatearDienteConSuperficie(d);
                 const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
-                return renderItem(pacienteId, 'Pulido Coronal', especificacion, `Pulido coronal: ${diente}`, `pulido-${idx}`);
+                return renderItem(pacienteId, 'Aplicación Flúor', especificacion, `Aplicación flúor: ${diente}`, `fluor-${idx}`);
               })}
-              {plan.fase_higienica_periodontal.raspaje_alisado_radicular?.dientes?.map((d, idx) => {
+              
+              {/* Pulido - CORREGIDO: es array directo, no .dientes */}
+              {plan.fase_higienica_periodontal.pulido?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Pulido', especificacion, `Pulido: ${diente}`, `pulido-${idx}`);
+              })}
+              
+              {/* Raspaje y Alisado - CORREGIDO: es array directo, no .dientes */}
+              {plan.fase_higienica_periodontal.raspaje_alisado_radicular?.map((d, idx) => {
                 const diente = formatearDienteConSuperficie(d);
                 const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
                 return renderItem(pacienteId, 'Raspaje y Alisado', especificacion, `Raspaje y alisado radicular: ${diente}`, `raspaje-${idx}`);
@@ -302,29 +338,66 @@ const MisPacientes = () => {
           </div>
         )}
 
+        {/* FASE HIGIÉNICA DENTAL */}
         {plan.fase_higienica_dental && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Higiénica Dental</h5>
             <ul className="space-y-1">
-              {plan.fase_higienica_dental.operatoria?.dientes?.map((d, idx) => {
+              {/* Operatoria/Resinas - CORREGIDO: es array directo */}
+              {plan.fase_higienica_dental.operatoria?.map((d, idx) => {
                 const diente = formatearDienteConSuperficie(d);
                 const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
-                return renderItem(pacienteId, 'Operatoria', especificacion, `Operatoria: ${diente}`, `operatoria-${idx}`);
+                return renderItem(pacienteId, 'Operatoria', especificacion, `Operatoria/Resina: ${diente}`, `operatoria-${idx}`);
               })}
+              
+              {/* Exodoncias */}
               {plan.fase_higienica_dental.exodoncias?.map((d, idx) => {
                 const diente = formatearDienteConSuperficie(d);
                 const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
                 return renderItem(pacienteId, 'Exodoncia', especificacion, `Exodoncia: ${diente}`, `exodoncia-${idx}`);
               })}
-              {plan.fase_higienica_dental.provisionales?.dientes?.map((d, idx) => {
+              
+              {/* Retiro de Coronas - NUEVO */}
+              {plan.fase_higienica_dental.retiro_coronas?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Retiro Corona', especificacion, `Retiro corona: ${diente}`, `retiro-corona-${idx}`);
+              })}
+              
+              {/* Provisionales - CORREGIDO: es array directo */}
+              {plan.fase_higienica_dental.provisionales?.map((d, idx) => {
                 const diente = formatearDienteConSuperficie(d);
                 const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
                 return renderItem(pacienteId, 'Provisional', especificacion, `Provisional: ${diente}`, `provisional-${idx}`);
               })}
+              
+              {/* Rebase de Provisionales - NUEVO */}
+              {plan.fase_higienica_dental.rebase_provisionales?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Rebase Provisional', especificacion, `Rebase provisional: ${diente}`, `rebase-prov-${idx}`);
+              })}
+              
+              {/* Prótesis Transicional - NUEVO */}
+              {plan.fase_higienica_dental.protesis_transicional?.superior && 
+                renderItem(pacienteId, 'Prótesis Transicional', 'Superior', 
+                  `Prótesis transicional superior${plan.fase_higienica_dental.protesis_transicional.dientes_reemplazar?.length > 0 ? ` (reemplaza: ${plan.fase_higienica_dental.protesis_transicional.dientes_reemplazar.join(', ')})` : ''}`, 
+                  'pt-superior')}
+              {plan.fase_higienica_dental.protesis_transicional?.inferior && 
+                renderItem(pacienteId, 'Prótesis Transicional', 'Inferior', 
+                  `Prótesis transicional inferior`, 
+                  'pt-inferior')}
+              
+              {/* Rebase de Prótesis Transicional - NUEVO */}
+              {plan.fase_higienica_dental.rebase_protesis_transicional?.superior && 
+                renderItem(pacienteId, 'Rebase Prótesis Transicional', 'Superior', 'Rebase prótesis transicional superior', 'rebase-pt-sup')}
+              {plan.fase_higienica_dental.rebase_protesis_transicional?.inferior && 
+                renderItem(pacienteId, 'Rebase Prótesis Transicional', 'Inferior', 'Rebase prótesis transicional inferior', 'rebase-pt-inf')}
             </ul>
           </div>
         )}
 
+        {/* FASE REEVALUATIVA */}
         {plan.fase_reevaluativa && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Reevaluativa</h5>
@@ -334,6 +407,7 @@ const MisPacientes = () => {
           </div>
         )}
 
+        {/* FASE CORRECTIVA INICIAL */}
         {plan.fase_correctiva_inicial && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Correctiva Inicial</h5>
@@ -343,47 +417,94 @@ const MisPacientes = () => {
                 const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
                 return renderItem(pacienteId, 'Endodoncia', especificacion, `Endodoncia: ${diente}`, `endodoncia-${idx}`);
               })}
+              
               {plan.fase_correctiva_inicial.postes?.map((d, idx) => {
                 const diente = formatearDienteConSuperficie(d);
                 const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
                 return renderItem(pacienteId, 'Poste', especificacion, `Poste: ${diente}`, `poste-${idx}`);
               })}
+              
               {plan.fase_correctiva_inicial.nucleos?.map((d, idx) => {
                 const diente = formatearDienteConSuperficie(d);
                 const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
                 return renderItem(pacienteId, 'Núcleo', especificacion, `Núcleo: ${diente}`, `nucleo-${idx}`);
               })}
+              
               {plan.fase_correctiva_inicial.reconstruccion_munon?.map((d, idx) => {
                 const diente = formatearDienteConSuperficie(d);
                 const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
                 return renderItem(pacienteId, 'Reconstrucción Muñón', especificacion, `Reconstrucción muñón: ${diente}`, `munon-${idx}`);
               })}
+              
+              {/* Implantes Observación - NUEVO */}
+              {plan.fase_correctiva_inicial.implantes_observacion?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Implante (Obs)', especificacion, `Implante (observación): ${diente}`, `implante-${idx}`);
+              })}
+              
+              {/* Cirugía Oral - NUEVO */}
+              {plan.fase_correctiva_inicial.cirugia_oral && 
+                renderItem(pacienteId, 'Cirugía Oral', '', `Cirugía oral: ${plan.fase_correctiva_inicial.cirugia_oral}`, 'cirugia-oral')}
+              
+              {/* Ajuste Oclusal - NUEVO */}
+              {plan.fase_correctiva_inicial.ajuste_oclusal?.completo && 
+                renderItem(pacienteId, 'Ajuste Oclusal', 'Completo', 'Ajuste oclusal completo', 'ajuste-completo')}
+              {plan.fase_correctiva_inicial.ajuste_oclusal?.cuadrantes?.map((c, idx) => 
+                renderItem(pacienteId, 'Ajuste Oclusal', `Cuadrante ${c}`, `Ajuste oclusal cuadrante ${c}`, `ajuste-q${idx}`)
+              )}
             </ul>
           </div>
         )}
 
+        {/* FASE CORRECTIVA FINAL */}
         {plan.fase_correctiva_final && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase Correctiva Final</h5>
             <ul className="space-y-1">
               {plan.fase_correctiva_final.coronas?.map((c, idx) => {
-                const texto = formatearConTipo(c);
+                const texto = formatearCorona(c);
                 const especificacion = typeof c === 'object' ? `Diente ${c.diente}` : `Diente ${c}`;
                 return renderItem(pacienteId, 'Corona', especificacion, `Corona: ${texto}`, `corona-${idx}`);
               })}
+              
+              {/* Incrustaciones - CORREGIDO para usar tipo_pieza y material */}
               {plan.fase_correctiva_final.incrustaciones?.map((i, idx) => {
-                const texto = formatearConTipo(i);
+                const texto = formatearIncrustacion(i);
                 const especificacion = typeof i === 'object' ? `Diente ${i.diente}` : `Diente ${i}`;
                 return renderItem(pacienteId, 'Incrustación', especificacion, `Incrustación: ${texto}`, `incrustacion-${idx}`);
               })}
-              {plan.fase_correctiva_final.protesis_removible && 
-                renderItem(pacienteId, 'Prótesis Removible', '', 'Prótesis removible', 'protesis-removible')}
-              {plan.fase_correctiva_final.protesis_total && 
-                renderItem(pacienteId, 'Prótesis Total', '', 'Prótesis total', 'protesis-total')}
+              
+              {/* Prótesis Removible - CORREGIDO: ahora es objeto {superior, inferior} */}
+              {plan.fase_correctiva_final.protesis_removible?.superior && 
+                renderItem(pacienteId, 'Prótesis Removible', 'Superior', 'Prótesis removible superior', 'ppr-superior')}
+              {plan.fase_correctiva_final.protesis_removible?.inferior && 
+                renderItem(pacienteId, 'Prótesis Removible', 'Inferior', 'Prótesis removible inferior', 'ppr-inferior')}
+              
+              {/* Prótesis Total - CORREGIDO: ahora es objeto {superior, inferior} */}
+              {plan.fase_correctiva_final.protesis_total?.superior && 
+                renderItem(pacienteId, 'Prótesis Total', 'Superior', 'Prótesis total superior', 'pt-superior')}
+              {plan.fase_correctiva_final.protesis_total?.inferior && 
+                renderItem(pacienteId, 'Prótesis Total', 'Inferior', 'Prótesis total inferior', 'pt-inferior')}
+              
+              {/* Prótesis Fija - NUEVO */}
+              {plan.fase_correctiva_final.protesis_fija?.map((p, idx) => {
+                const texto = formatearProtesisFija(p);
+                const especificacion = typeof p === 'object' ? `Tramo ${p.tramo}` : p;
+                return renderItem(pacienteId, 'Prótesis Fija', especificacion, `Prótesis fija: ${texto}`, `ppf-${idx}`);
+              })}
+              
+              {/* Carillas - NUEVO */}
+              {plan.fase_correctiva_final.carillas?.map((d, idx) => {
+                const diente = formatearDienteConSuperficie(d);
+                const especificacion = typeof d === 'object' ? `Diente ${d.diente}` : `Diente ${d}`;
+                return renderItem(pacienteId, 'Carilla', especificacion, `Carilla: ${diente}`, `carilla-${idx}`);
+              })}
             </ul>
           </div>
         )}
 
+        {/* FASE DE MANTENIMIENTO */}
         {plan.fase_mantenimiento && (
           <div>
             <h5 className="font-semibold text-blue-800 mb-2">Fase de Mantenimiento</h5>
@@ -398,179 +519,174 @@ const MisPacientes = () => {
 
   if (cargando) {
     return (
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-          <Loader2 className="animate-spin mx-auto text-teal-600 mb-4" size={48} />
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="animate-spin h-8 w-8 text-blue-600 mx-auto mb-2" />
           <p className="text-gray-600">Cargando pacientes...</p>
         </div>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <div className="flex items-center gap-2 text-red-600 mb-4">
-            <AlertCircle size={24} />
-            <span className="font-medium">Error al cargar pacientes</span>
-          </div>
-          <p className="text-gray-600">{error}</p>
-          <button
-            onClick={cargarPacientes}
-            className="mt-4 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition"
-          >
-            Reintentar
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-        <div className="bg-teal-600 text-white px-6 py-4">
-          <h2 className="text-xl font-bold flex items-center gap-2">
-            <Users size={24} />
-            Mis Pacientes
-          </h2>
-          <p className="text-teal-100 text-sm mt-1">
-            Pacientes asignados. Puedes ver el historial de planes y proponer cambios.
-          </p>
+    <div className="min-h-screen bg-gray-50 py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        <div className="flex items-center gap-3 mb-6">
+          <Users className="text-blue-600" size={28} />
+          <h1 className="text-2xl font-bold text-gray-800">Mis Pacientes</h1>
         </div>
 
-        <div className="p-6">
-          {pacientes.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <Users size={48} className="mx-auto mb-4 opacity-50" />
-              <p>No tienes pacientes asignados aún.</p>
-              <p className="text-sm mt-2">Registra un nuevo paciente para comenzar.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {[...pacientes]
-                .sort((a, b) => {
-                  const nombreA = `${a.primer_nombre} ${a.primer_apellido}`.toLowerCase();
-                  const nombreB = `${b.primer_nombre} ${b.primer_apellido}`.toLowerCase();
-                  return nombreA.localeCompare(nombreB);
-                })
-                .map(paciente => {
-                const planes = paciente.planes_tratamiento || [];
-                const planesOrdenados = [...planes].sort((a, b) => 
-                  new Date(b.created_at) - new Date(a.created_at)
-                );
-                const estaExpandido = pacienteExpandido === paciente.id;
+        {error && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+            <button onClick={() => setError(null)} className="ml-auto">
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
-                return (
-                  <div key={paciente.id} className="border rounded-lg overflow-hidden">
-                    <div 
-                      className="bg-gray-50 px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition"
-                      onClick={() => togglePaciente(paciente.id)}
-                    >
-                      <div>
-                        <h3 className="font-semibold text-gray-900">
-                          {paciente.primer_nombre} {paciente.segundo_nombre || ''} {paciente.primer_apellido} {paciente.segundo_apellido || ''}
-                        </h3>
-                        <p className="text-sm text-gray-600">
-                          CC: {paciente.cedula} | Tel: {paciente.celular}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {planesOrdenados.length} plan(es) de tratamiento
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {estaExpandido ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                      </div>
+        {mensajeExito && !modalEditar && (
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-700">
+            <CheckCircle size={20} />
+            <span>{mensajeExito}</span>
+            <button onClick={() => setMensajeExito(null)} className="ml-auto">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {pacientes.length === 0 ? (
+          <div className="bg-white rounded-lg shadow p-8 text-center">
+            <Users className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+            <p className="text-gray-600">No tienes pacientes asignados aún.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {pacientes.map((paciente) => {
+              const esPacienteExpandido = pacienteExpandido === paciente.id;
+              const planes = paciente.planes_tratamiento || [];
+              const tienePlanes = planes.length > 0;
+              
+              return (
+                <div key={paciente.id} className="bg-white rounded-lg shadow overflow-hidden">
+                  <div
+                    onClick={() => togglePaciente(paciente.id)}
+                    className="p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between"
+                  >
+                    <div>
+                      <h3 className="font-semibold text-gray-800">
+                        {paciente.primer_nombre} {paciente.segundo_nombre || ''} {paciente.primer_apellido} {paciente.segundo_apellido || ''}
+                      </h3>
+                      <p className="text-sm text-gray-500">CC: {paciente.cedula}</p>
                     </div>
+                    <div className="flex items-center gap-3">
+                      {!tienePlanes && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setModalNuevoPlan(paciente); }}
+                          className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition"
+                        >
+                          Cargar Plan
+                        </button>
+                      )}
+                      {tienePlanes && (
+                        <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                          {planes.length} plan{planes.length > 1 ? 'es' : ''}
+                        </span>
+                      )}
+                      {esPacienteExpandido ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                    </div>
+                  </div>
 
-                    {estaExpandido && (
-                      <div className="px-4 py-4 bg-white border-t">
-                        <h4 className="font-semibold text-gray-800 mb-3">Historial de Planes de Tratamiento</h4>
-                        
-                        {planesOrdenados.length === 0 ? (
-                          <div className="text-center py-4">
-                            <p className="text-gray-500 mb-3">Sin planes registrados</p>
-                            <button
-                              onClick={() => setModalNuevoPlan(paciente)}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm"
-                            >
-                              + Cargar Plan de Tratamiento
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            {planesOrdenados.map((plan, index) => {
-                              const planFormateado = formatearPlan(plan.plan_completo);
-                              const esPlanExpandido = planExpandido === plan.id;
-                              const esActivo = !plan.fecha_finalizacion;
+                  {esPacienteExpandido && (
+                    <div className="border-t px-4 py-3 bg-gray-50">
+                      <div className="grid grid-cols-2 gap-4 mb-4 text-sm">
+                        <div>
+                          <span className="text-gray-500">Teléfono:</span>
+                          <span className="ml-2 font-medium">{paciente.celular || 'N/A'}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500">Registrado:</span>
+                          <span className="ml-2 font-medium">{formatearFecha(paciente.created_at)}</span>
+                        </div>
+                      </div>
 
-                              return (
-                                <div key={plan.id} className={`border rounded-lg ${esActivo ? 'border-green-300 bg-green-50' : 'border-gray-200'}`}>
-                                  <div 
-                                    className="px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition"
-                                    onClick={() => togglePlan(plan.id)}
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <div className={`w-2 h-2 rounded-full ${esActivo ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                                      <div>
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-medium text-sm">
-                                            Plan #{planesOrdenados.length - index}
-                                          </span>
-                                          {esActivo && (
-                                            <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">Activo</span>
-                                          )}
-                                          {plan.fecha_finalizacion && (
-                                            <span className="text-xs bg-gray-500 text-white px-2 py-0.5 rounded">Finalizado</span>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
-                                          <span className="flex items-center gap-1">
-                                            <Calendar size={12} />
-                                            Inicio: {formatearFecha(plan.created_at)}
-                                          </span>
-                                          {plan.fecha_finalizacion && (
-                                            <span className="flex items-center gap-1">
-                                              <Clock size={12} />
-                                              Fin: {formatearFecha(plan.fecha_finalizacion)}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
+                      {!tienePlanes ? (
+                        <p className="text-gray-500 text-sm italic">Este paciente aún no tiene plan de tratamiento.</p>
+                      ) : (
+                        <div className="space-y-3">
+                          <h4 className="font-medium text-gray-700">Planes de Tratamiento:</h4>
+                          {planes.map((plan) => {
+                            const esPlanExpandido = planExpandido === plan.id;
+                            const planFormateado = formatearPlan(plan.plan_completo);
+                            const esActivo = plan.estado === 'aprobado' && !plan.fecha_finalizacion;
+
+                            return (
+                              <div key={plan.id} className="border rounded-lg overflow-hidden">
+                                <div
+                                  onClick={() => togglePlan(plan.id)}
+                                  className={`p-3 cursor-pointer flex items-center justify-between ${esPlanExpandido ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
+                                >
+                                  <div>
                                     <div className="flex items-center gap-2">
+                                      <span className={`text-xs px-2 py-0.5 rounded ${
+                                        plan.estado === 'aprobado' ? 'bg-green-100 text-green-700' :
+                                        plan.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-700' :
+                                        'bg-red-100 text-red-700'
+                                      }`}>
+                                        {plan.estado}
+                                      </span>
                                       {esActivo && (
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); abrirModalEditar(paciente, plan); }}
-                                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition"
-                                          title="Proponer cambio"
-                                        >
-                                          <Edit size={16} />
-                                        </button>
+                                        <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">Activo</span>
                                       )}
-                                      {esPlanExpandido ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                      {plan.fecha_finalizacion && (
+                                        <span className="text-xs bg-gray-500 text-white px-2 py-0.5 rounded">Finalizado</span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
+                                      <span className="flex items-center gap-1">
+                                        <Calendar size={12} />
+                                        Inicio: {formatearFecha(plan.created_at)}
+                                      </span>
+                                      {plan.fecha_finalizacion && (
+                                        <span className="flex items-center gap-1">
+                                          <Clock size={12} />
+                                          Fin: {formatearFecha(plan.fecha_finalizacion)}
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
-
-                                  {esPlanExpandido && (
-                                    <div className="px-4 py-3 border-t bg-white">
-                                      {renderPlan(planFormateado, paciente.id)}
-                                    </div>
-                                  )}
+                                  <div className="flex items-center gap-2">
+                                    {esActivo && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); abrirModalEditar(paciente, plan); }}
+                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition"
+                                        title="Proponer cambio"
+                                      >
+                                        <Edit size={16} />
+                                      </button>
+                                    )}
+                                    {esPlanExpandido ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                  </div>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+
+                                {esPlanExpandido && (
+                                  <div className="px-4 py-3 border-t bg-white">
+                                    {renderPlan(planFormateado, paciente.id)}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Modal Editar Plan */}
