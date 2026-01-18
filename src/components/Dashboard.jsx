@@ -18,6 +18,145 @@ const Dashboard = () => {
 
   const N8N_MODIFICAR_PLAN_URL = 'https://brainlogic.ddnsfree.com/webhook/ces-modificar-plan';
 
+  // Función para contar todos los tratamientos de un plan
+  const contarTratamientosPlan = (planCompleto) => {
+    if (!planCompleto) return 0;
+    
+    let plan;
+    try {
+      plan = typeof planCompleto === 'string' ? JSON.parse(planCompleto) : planCompleto;
+    } catch {
+      return 0;
+    }
+
+    let total = 0;
+
+    // Fase Higiénica Periodontal
+    if (plan.fase_higienica_periodontal) {
+      const fhp = plan.fase_higienica_periodontal;
+      if (fhp.profilaxis === true) total++;
+      if (fhp.detartraje?.generalizado === true) total++;
+      if (fhp.detartraje?.dientes?.length > 0) total += fhp.detartraje.dientes.length;
+      if (fhp.aplicacion_fluor?.length > 0) total += fhp.aplicacion_fluor.length;
+      if (fhp.pulido?.length > 0) total += fhp.pulido.length;
+      if (fhp.raspaje_alisado_radicular?.length > 0) total += fhp.raspaje_alisado_radicular.length;
+    }
+
+    // Fase Higiénica Dental
+    if (plan.fase_higienica_dental) {
+      const fhd = plan.fase_higienica_dental;
+      if (fhd.operatoria?.length > 0) total += fhd.operatoria.length;
+      if (fhd.exodoncias?.length > 0) total += fhd.exodoncias.length;
+      if (fhd.retiro_coronas?.length > 0) total += fhd.retiro_coronas.length;
+      if (fhd.provisionales?.length > 0) total += fhd.provisionales.length;
+      if (fhd.rebase_provisionales?.length > 0) total += fhd.rebase_provisionales.length;
+      if (fhd.protesis_transicional?.superior === true) total++;
+      if (fhd.protesis_transicional?.inferior === true) total++;
+      if (fhd.rebase_protesis_transicional?.superior === true) total++;
+      if (fhd.rebase_protesis_transicional?.inferior === true) total++;
+    }
+
+    // Fase Reevaluativa
+    if (plan.fase_reevaluativa === true) total++;
+
+    // Fase Correctiva Inicial
+    if (plan.fase_correctiva_inicial) {
+      const fci = plan.fase_correctiva_inicial;
+      if (fci.endodoncia?.length > 0) total += fci.endodoncia.length;
+      if (fci.postes?.length > 0) total += fci.postes.length;
+      if (fci.nucleos?.length > 0) total += fci.nucleos.length;
+      if (fci.reconstruccion_munon?.length > 0) total += fci.reconstruccion_munon.length;
+      if (fci.implantes_observacion?.length > 0) total += fci.implantes_observacion.length;
+      if (fci.cirugia_oral) total++;
+      if (fci.ajuste_oclusal?.completo === true) total++;
+      if (fci.ajuste_oclusal?.cuadrantes?.length > 0) total += fci.ajuste_oclusal.cuadrantes.length;
+    }
+
+    // Fase Correctiva Final
+    if (plan.fase_correctiva_final) {
+      const fcf = plan.fase_correctiva_final;
+      if (fcf.coronas?.length > 0) total += fcf.coronas.length;
+      if (fcf.incrustaciones?.length > 0) total += fcf.incrustaciones.length;
+      if (fcf.protesis_removible?.superior === true) total++;
+      if (fcf.protesis_removible?.inferior === true) total++;
+      if (fcf.protesis_total?.superior === true) total++;
+      if (fcf.protesis_total?.inferior === true) total++;
+      if (fcf.protesis_fija?.length > 0) total += fcf.protesis_fija.length;
+      if (fcf.carillas?.length > 0) total += fcf.carillas.length;
+    }
+
+    // Fase Mantenimiento
+    if (plan.fase_mantenimiento === true) total++;
+
+    return total;
+  };
+
+  // Verificar si el plan debe finalizarse
+  const verificarFinalizacionPlan = async (pacienteId) => {
+    try {
+      // Obtener el plan del paciente
+      const planResponse = await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/planes_tratamiento?paciente_id=eq.${pacienteId}&estado=eq.aprobado&select=id,plan_completo`,
+        {
+          headers: {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+          }
+        }
+      );
+
+      if (!planResponse.ok) return;
+
+      const planes = await planResponse.json();
+      if (!planes || planes.length === 0) return;
+
+      const plan = planes[0];
+      const totalTratamientos = contarTratamientosPlan(plan.plan_completo);
+
+      // Contar TT aprobados para este paciente
+      const reportesResponse = await fetch(
+        `${SUPABASE_CONFIG.URL}/rest/v1/reporte_items?estado_reportado=eq.completo&estado_aprobacion=eq.aprobado&select=id,reportes_tratamiento!inner(paciente_id)&reportes_tratamiento.paciente_id=eq.${pacienteId}`,
+        {
+          headers: {
+            'apikey': SUPABASE_CONFIG.ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`
+          }
+        }
+      );
+
+      if (!reportesResponse.ok) return;
+
+      const ttAprobados = await reportesResponse.json();
+      const totalTTAprobados = ttAprobados?.length || 0;
+
+      console.log(`Plan ${plan.id}: ${totalTTAprobados}/${totalTratamientos} tratamientos completados`);
+
+      // Si todos los tratamientos están completos, finalizar el plan
+      if (totalTTAprobados >= totalTratamientos && totalTratamientos > 0) {
+        await fetch(
+          `${SUPABASE_CONFIG.URL}/rest/v1/planes_tratamiento?id=eq.${plan.id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPABASE_CONFIG.ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              estado: 'finalizado',
+              fecha_cierre: new Date().toISOString(),
+              motivo_cierre: 'Todos los tratamientos completados y aprobados'
+            })
+          }
+        );
+
+        alert('🎉 ¡Plan de tratamiento FINALIZADO! Todos los tratamientos han sido completados.');
+      }
+    } catch (err) {
+      console.error('Error verificando finalización:', err);
+    }
+  };
+
   const cargarReportes = async () => {
     setCargando(true);
     setError(null);
@@ -53,6 +192,7 @@ const Dashboard = () => {
             correo: estudiante?.correo || '',
             paciente: paciente ? `${paciente.primer_nombre} ${paciente.primer_apellido}` : 'Sin paciente',
             cedula: paciente?.cedula || '',
+            pacienteId: reporte?.paciente_id,
             observacion: reporte?.reporte_texto || '',
             items: []
           };
@@ -95,7 +235,7 @@ const Dashboard = () => {
     cargarReportes();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const aprobarItem = async (itemId) => {
+  const aprobarItem = async (itemId, pacienteId, esCompleto) => {
     setProcesando(itemId);
 
     try {
@@ -121,6 +261,11 @@ const Dashboard = () => {
           ...reporte,
           items: reporte.items.filter(item => item.id !== itemId)
         })).filter(reporte => reporte.items.length > 0));
+
+        // Si es un TT (completo), verificar si el plan debe finalizarse
+        if (esCompleto && pacienteId) {
+          await verificarFinalizacionPlan(pacienteId);
+        }
       } else {
         alert('Error al aprobar');
       }
@@ -179,7 +324,6 @@ const Dashboard = () => {
     setProcesando(`mod-${mod.id}`);
 
     try {
-      // Obtener el plan actual
       const planActual = mod.planes_tratamiento?.plan_completo;
       const planId = mod.plan_id;
 
@@ -189,7 +333,6 @@ const Dashboard = () => {
         return;
       }
 
-      // Llamar al webhook de n8n para procesar la modificación con LLM
       const n8nResponse = await fetch(N8N_MODIFICAR_PLAN_URL, {
         method: 'POST',
         headers: {
@@ -219,7 +362,6 @@ const Dashboard = () => {
         return;
       }
 
-      // El plan ya fue actualizado por n8n, solo marcamos la modificación como aprobada
       const response = await fetch(
         `${SUPABASE_CONFIG.URL}/rest/v1/modificaciones_plan?id=eq.${mod.id}`,
         {
@@ -363,7 +505,6 @@ const Dashboard = () => {
           <div className="space-y-4">
             {modificaciones.map(mod => (
               <div key={mod.id} className="bg-white rounded-lg shadow-lg overflow-hidden border-l-4 border-purple-500">
-                {/* Header */}
                 <div className="bg-purple-50 px-6 py-4 border-b">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -382,7 +523,6 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                {/* Info Paciente */}
                 <div className="px-6 py-3 bg-gray-50 border-b">
                   <div className="flex items-center gap-2">
                     <FileText size={16} className="text-gray-600" />
@@ -393,7 +533,6 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                {/* Descripción del cambio */}
                 <div className="px-6 py-4">
                   <div className="flex items-start gap-2 mb-4">
                     <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
@@ -404,7 +543,6 @@ const Dashboard = () => {
                     <span className="font-medium">📝 Solicitud:</span> {mod.descripcion_cambio}
                   </p>
 
-                  {/* Botones de acción */}
                   <div className="flex items-center gap-2 mt-4 justify-end">
                     {modRechazando === mod.id ? (
                       <div className="flex items-center gap-2">
@@ -472,7 +610,6 @@ const Dashboard = () => {
           <div className="space-y-6">
             {reportes.map(reporte => (
               <div key={reporte.id} className="bg-white rounded-lg shadow-lg overflow-hidden">
-                {/* Header del reporte */}
                 <div className="bg-gray-50 px-6 py-4 border-b">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
@@ -491,7 +628,6 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                {/* Info Paciente */}
                 <div className="px-6 py-3 bg-purple-50 border-b">
                   <div className="flex items-center gap-2">
                     <FileText size={16} className="text-purple-600" />
@@ -500,7 +636,6 @@ const Dashboard = () => {
                   </div>
                 </div>
 
-                {/* Observación del estudiante */}
                 {reporte.observacion && reporte.observacion !== 'Reporte de tratamientos' && (
                   <div className="px-6 py-3 bg-yellow-50 border-b">
                     <p className="text-sm text-yellow-800">
@@ -509,7 +644,6 @@ const Dashboard = () => {
                   </div>
                 )}
 
-                {/* Items del reporte */}
                 <div className="divide-y">
                   {reporte.items.map(item => (
                     <div key={item.id} className="px-6 py-4">
@@ -530,7 +664,6 @@ const Dashboard = () => {
                           </div>
                         </div>
 
-                        {/* Botones de acción */}
                         <div className="flex items-center gap-2 ml-4">
                           {itemRechazando === item.id ? (
                             <div className="flex items-center gap-2">
@@ -559,7 +692,7 @@ const Dashboard = () => {
                           ) : (
                             <>
                               <button
-                                onClick={() => aprobarItem(item.id)}
+                                onClick={() => aprobarItem(item.id, reporte.pacienteId, item.estado_reportado === 'completo')}
                                 disabled={procesando === item.id}
                                 className="flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:bg-gray-300 transition"
                               >

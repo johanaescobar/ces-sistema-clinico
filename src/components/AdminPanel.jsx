@@ -3,8 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, Clock, Calendar, AlertTriangle, BarChart3, 
   Plus, Trash2, Edit2, Save, X, RefreshCw, Loader2,
-  CheckCircle, XCircle, UserPlus, Settings, FileText,
-  ChevronDown, ChevronUp
+  CheckCircle, XCircle, UserPlus, Settings, FileText
 } from 'lucide-react';
 import { SUPABASE_CONFIG } from '../config/api';
 
@@ -112,15 +111,18 @@ const GestionEstudiantes = () => {
   const eliminar = async (id) => {
     if (!window.confirm('¿Eliminar este estudiante? Sus pacientes quedarán sin asignar.')) return;
     try {
+      // Desasignar pacientes
       await supabaseFetch(`pacientes?estudiante_actual_id=eq.${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ estudiante_actual_id: null })
       });
+      // Desasignar citas futuras
       const hoy = new Date().toISOString().split('T')[0];
       await supabaseFetch(`citas?estudiante_id=eq.${id}&fecha_cita=gte.${hoy}`, {
         method: 'PATCH',
         body: JSON.stringify({ estudiante_id: null })
       });
+      // Eliminar estudiante
       await supabaseFetch(`usuarios?id=eq.${id}`, { method: 'DELETE' });
       cargar();
     } catch (err) {
@@ -136,14 +138,17 @@ const GestionEstudiantes = () => {
     try {
       const hoy = new Date().toISOString().split('T')[0];
       for (const id of seleccionados) {
+        // Desasignar pacientes
         await supabaseFetch(`pacientes?estudiante_actual_id=eq.${id}`, {
           method: 'PATCH',
           body: JSON.stringify({ estudiante_actual_id: null })
         });
+        // Desasignar citas futuras
         await supabaseFetch(`citas?estudiante_id=eq.${id}&fecha_cita=gte.${hoy}`, {
           method: 'PATCH',
           body: JSON.stringify({ estudiante_id: null })
         });
+        // Eliminar estudiante
         await supabaseFetch(`usuarios?id=eq.${id}`, { method: 'DELETE' });
       }
       setSeleccionados([]);
@@ -214,20 +219,21 @@ const GestionEstudiantes = () => {
               value={form.correo}
               onChange={(e) => setForm({ ...form, correo: e.target.value })}
               className="border rounded-lg px-3 py-2"
+              disabled={!!editando}
             />
             <input
-              placeholder="Celular"
+              placeholder="Celular (3001234567)"
               value={form.celular}
-              onChange={(e) => setForm({ ...form, celular: e.target.value })}
+              onChange={(e) => setForm({ ...form, celular: e.target.value.replace(/\D/g, '') })}
               className="border rounded-lg px-3 py-2"
             />
           </div>
           <div className="flex gap-2 mt-3">
             <button onClick={guardar} className="flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-              <Save size={18} /> Guardar
+              <Save size={16} /> Guardar
             </button>
             <button onClick={() => { setNuevo(false); setEditando(null); setError(''); }} className="flex items-center gap-1 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
-              <X size={18} /> Cancelar
+              <X size={16} /> Cancelar
             </button>
           </div>
         </div>
@@ -264,30 +270,26 @@ const GestionEstudiantes = () => {
                   />
                 </td>
                 <td className="p-3">{e.nombre_completo}</td>
-                <td className="p-3 text-sm">{e.correo}</td>
+                <td className="p-3 text-sm text-gray-600">{e.correo}</td>
                 <td className="p-3">{e.celular}</td>
                 <td className="p-3 text-center">
                   <button
                     onClick={() => toggleActivo(e.id, e.activo)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      e.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                    }`}
+                    className={`px-2 py-1 rounded text-xs font-medium ${e.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
                   >
                     {e.activo ? 'Activo' : 'Inactivo'}
                   </button>
                 </td>
                 <td className="p-3 text-center">
-                  <div className="flex justify-center gap-2">
-                    <button
-                      onClick={() => { setEditando(e.id); setForm({ nombre_completo: e.nombre_completo, correo: e.correo, celular: e.celular }); }}
-                      className="text-blue-600 hover:text-blue-800"
-                    >
-                      <Edit2 size={18} />
-                    </button>
-                    <button onClick={() => eliminar(e.id)} className="text-red-600 hover:text-red-800">
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => { setEditando(e.id); setForm({ nombre_completo: e.nombre_completo, correo: e.correo, celular: e.celular }); }}
+                    className="text-blue-600 hover:text-blue-800 mx-1"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                  <button onClick={() => eliminar(e.id)} className="text-red-600 hover:text-red-800 mx-1">
+                    <Trash2 size={18} />
+                  </button>
                 </td>
               </tr>
             ))}
@@ -319,21 +321,25 @@ const GestionPacientes = () => {
   });
   const [seleccionados, setSeleccionados] = useState([]);
   const [eliminando, setEliminando] = useState(false);
-  const [pacienteExpandido, setPacienteExpandido] = useState(null);
 
+  // Obtener usuario actual de sessionStorage
   const usuarioActual = JSON.parse(sessionStorage.getItem('usuario') || '{}');
 
+  // Formatear teléfono para visualización
   const formatearTelefono = (tel) => {
     if (!tel) return '';
     const digitos = tel.replace(/\D/g, '');
     if (digitos.length === 10) {
+      // Celular: 316 · 471 · 33 · 00
       return `${digitos.slice(0,3)} · ${digitos.slice(3,6)} · ${digitos.slice(6,8)} · ${digitos.slice(8,10)}`;
     } else if (digitos.length === 7) {
+      // Fijo: 613 · 36 · 79
       return `${digitos.slice(0,3)} · ${digitos.slice(3,5)} · ${digitos.slice(5,7)}`;
     }
     return tel;
   };
 
+  // Validar teléfono
   const validarTelefono = (tel) => {
     const digitos = tel.replace(/\D/g, '');
     if (digitos.length === 10 && digitos.startsWith('3')) {
@@ -348,8 +354,8 @@ const GestionPacientes = () => {
     setCargando(true);
     try {
       const [pacData, estData] = await Promise.all([
-        supabaseFetch('pacientes?select=*,usuarios!pacientes_estudiante_actual_id_fkey(nombre_completo),planes_tratamiento(*)&order=primer_nombre.asc,primer_apellido.asc'),
-        supabaseFetch('usuarios?rol=eq.estudiante&activo=eq.true&select=id,nombre_completo&order=nombre_completo.asc')
+        supabaseFetch('pacientes?select=*,usuarios!pacientes_estudiante_actual_id_fkey(nombre_completo)&order=created_at.desc'),
+        supabaseFetch('usuarios?rol=eq.estudiante&activo=eq.true&select=id,nombre_completo')
       ]);
       setPacientes(pacData || []);
       setEstudiantes(estData || []);
@@ -363,19 +369,24 @@ const GestionPacientes = () => {
   useEffect(() => { cargar(); }, []);
 
   const crearPaciente = async () => {
+    // Validar campos obligatorios
     if (!nuevo.primer_nombre || !nuevo.primer_apellido || !nuevo.cedula) {
       setError('Nombre, apellido y cédula son obligatorios');
       return;
     }
+
     if (!nuevo.celular) {
       setError('El teléfono es obligatorio');
       return;
     }
+
+    // Validar formato de teléfono
     const telValidacion = validarTelefono(nuevo.celular);
     if (!telValidacion.valido) {
       setError('Teléfono inválido. Celular: 10 dígitos empezando con 3. Fijo: 7 dígitos.');
       return;
     }
+
     if (!nuevo.estudiante_actual_id) {
       setError('Debe asignar un estudiante');
       return;
@@ -390,7 +401,7 @@ const GestionPacientes = () => {
           primer_apellido: nuevo.primer_apellido,
           segundo_apellido: nuevo.segundo_apellido || null,
           cedula: nuevo.cedula,
-          celular: nuevo.celular.replace(/\D/g, ''),
+          celular: nuevo.celular.replace(/\D/g, ''), // Solo dígitos
           estudiante_actual_id: nuevo.estudiante_actual_id,
           registrado_por: usuarioActual.id
         })
@@ -414,6 +425,7 @@ const GestionPacientes = () => {
 
   const cambiarEstudiante = async (pacienteId, nuevoEstudianteId) => {
     try {
+      // 1. Si no hay nuevo estudiante, solo desasignar
       if (!nuevoEstudianteId) {
         await supabaseFetch(`pacientes?id=eq.${pacienteId}`, {
           method: 'PATCH',
@@ -423,16 +435,20 @@ const GestionPacientes = () => {
         return;
       }
 
+      // 2. Verificar citas programadas del paciente
       const citasPaciente = await supabaseFetch(
         `citas?paciente_id=eq.${pacienteId}&estado=eq.programada&select=id,fecha_cita,hora`
       );
 
+      // 3. Si hay citas, verificar conflictos con el nuevo estudiante
       if (citasPaciente && citasPaciente.length > 0) {
         const conflictos = [];
+        
         for (const cita of citasPaciente) {
           const citasNuevoEst = await supabaseFetch(
             `citas?estudiante_id=eq.${nuevoEstudianteId}&fecha_cita=eq.${cita.fecha_cita}&estado=eq.programada&select=id`
           );
+          
           if (citasNuevoEst && citasNuevoEst.length >= 2) {
             conflictos.push(`${cita.fecha_cita}: ya tiene 2 citas`);
           }
@@ -445,15 +461,18 @@ const GestionPacientes = () => {
             conflictos.join('\n') + 
             `\n\n¿Reasignar de todas formas?`
           );
+          
           if (!confirmar) return;
         }
       }
 
+      // 4. Reasignar paciente
       await supabaseFetch(`pacientes?id=eq.${pacienteId}`, {
         method: 'PATCH',
         body: JSON.stringify({ estudiante_actual_id: nuevoEstudianteId })
       });
 
+      // 5. Reasignar citas programadas
       if (citasPaciente && citasPaciente.length > 0) {
         await supabaseFetch(`citas?paciente_id=eq.${pacienteId}&estado=eq.programada`, {
           method: 'PATCH',
@@ -470,6 +489,7 @@ const GestionPacientes = () => {
   const eliminarPaciente = async (id) => {
     if (!window.confirm('¿Eliminar este paciente? Todos sus datos (citas, planes, reportes) se eliminarán.')) return;
     try {
+      // 1. Eliminar items de reportes
       const reportes = await supabaseFetch(`reportes_tratamiento?paciente_id=eq.${id}&select=id`);
       if (reportes && reportes.length > 0) {
         const reporteIds = reportes.map(r => r.id);
@@ -477,10 +497,13 @@ const GestionPacientes = () => {
           await supabaseFetch(`reporte_items?reporte_id=eq.${rid}`, { method: 'DELETE' });
         }
       }
+      // 2. Eliminar reportes
       await supabaseFetch(`reportes_tratamiento?paciente_id=eq.${id}`, { method: 'DELETE' });
+      // 3. Eliminar planes
       await supabaseFetch(`planes_tratamiento?paciente_id=eq.${id}`, { method: 'DELETE' });
-      const hoy = new Date().toISOString().split('T')[0];
-      await supabaseFetch(`citas?paciente_id=eq.${id}&fecha_cita=gte.${hoy}`, { method: 'DELETE' });
+      // 4. Eliminar todas las citas
+      await supabaseFetch(`citas?paciente_id=eq.${id}`, { method: 'DELETE' });
+      // 5. Eliminar paciente
       await supabaseFetch(`pacientes?id=eq.${id}`, { method: 'DELETE' });
       cargar();
     } catch (err) {
@@ -488,23 +511,27 @@ const GestionPacientes = () => {
     }
   };
 
-  const eliminarSeleccionados = async () => {
+ const eliminarSeleccionados = async () => {
     if (seleccionados.length === 0) return;
     if (!window.confirm(`¿Eliminar ${seleccionados.length} pacientes? Todos sus datos se eliminarán.`)) return;
     
     setEliminando(true);
     try {
       for (const id of seleccionados) {
+        // 1. Items de reportes
         const reportes = await supabaseFetch(`reportes_tratamiento?paciente_id=eq.${id}&select=id`);
         if (reportes && reportes.length > 0) {
           for (const r of reportes) {
             await supabaseFetch(`reporte_items?reporte_id=eq.${r.id}`, { method: 'DELETE' });
           }
         }
+        // 2. Reportes
         await supabaseFetch(`reportes_tratamiento?paciente_id=eq.${id}`, { method: 'DELETE' });
+        // 3. Planes
         await supabaseFetch(`planes_tratamiento?paciente_id=eq.${id}`, { method: 'DELETE' });
-        const hoy = new Date().toISOString().split('T')[0];
-        await supabaseFetch(`citas?paciente_id=eq.${id}&fecha_cita=gte.${hoy}`, { method: 'DELETE' });
+        // 4. Citas
+        await supabaseFetch(`citas?paciente_id=eq.${id}`, { method: 'DELETE' });
+        // 5. Paciente
         await supabaseFetch(`pacientes?id=eq.${id}`, { method: 'DELETE' });
       }
       setSeleccionados([]);
@@ -522,156 +549,21 @@ const GestionPacientes = () => {
     );
   };
 
-  //const toggleTodos = () => {
-  //  if (seleccionados.length === pacientesFiltrados.length) {
- //     setSeleccionados([]);
- //   } else {
-  //    setSeleccionados(pacientesFiltrados.map(p => p.id));
- //   }
- // };
+  const toggleTodos = () => {
+    if (seleccionados.length === pacientesFiltrados.length) {
+      setSeleccionados([]);
+    } else {
+      setSeleccionados(pacientesFiltrados.map(p => p.id));
+    }
+  };
 
   const pacientesFiltrados = pacientes.filter(p => {
     const nombre = `${p.primer_nombre} ${p.segundo_nombre || ''} ${p.primer_apellido} ${p.segundo_apellido || ''}`.toLowerCase();
-    const cedula = p.cedula || '';
-    return nombre.includes(filtro.toLowerCase()) || cedula.includes(filtro);
+    return nombre.includes(filtro.toLowerCase()) || p.cedula.includes(filtro);
   });
 
-  // Funciones para renderizar plan
-  const formatearPlan = (planCompleto) => {
-    if (!planCompleto) return null;
-    try {
-      return typeof planCompleto === 'string' ? JSON.parse(planCompleto) : planCompleto;
-    } catch {
-      return null;
-    }
-  };
-
-  const formatearDienteConSuperficie = (item) => {
-    if (typeof item === 'object' && item !== null) {
-      if (item.superficies) return `${item.diente} (${item.superficies})`;
-      if (item.superficie) return `${item.diente} (${item.superficie})`;
-      return item.diente;
-    }
-    return item;
-  };
-
-  const formatearCorona = (item) => {
-    if (typeof item === 'object' && item !== null) {
-      return `${item.diente}${item.tipo ? ` (${item.tipo})` : ''}`;
-    }
-    return item;
-  };
-
-  const formatearIncrustacion = (item) => {
-    if (typeof item === 'object' && item !== null) {
-      let texto = `${item.diente}`;
-      const detalles = [];
-      if (item.tipo_pieza) detalles.push(item.tipo_pieza);
-      if (item.material) detalles.push(item.material);
-      if (detalles.length > 0) texto += ` (${detalles.join(', ')})`;
-      return texto;
-    }
-    return item;
-  };
-
-  const formatearProtesisFija = (item) => {
-    if (typeof item === 'object' && item !== null) {
-      return `Tramo ${item.tramo}${item.tipo ? ` (${item.tipo})` : ''}`;
-    }
-    return item;
-  };
-
-  const renderPlanItem = (texto, key) => (
-    <li key={key} className="flex items-center gap-2 text-gray-700">
-      <span className="w-4 h-4 border border-gray-300 rounded-full flex-shrink-0"></span>
-      <span>{texto}</span>
-    </li>
-  );
-
-  const renderPlan = (plan) => {
-    if (!plan) return <p className="text-gray-500 text-sm">Sin plan de tratamiento</p>;
-
-    return (
-      <div className="space-y-4 text-sm">
-        {plan.fase_higienica_periodontal && (
-          <div>
-            <h5 className="font-semibold text-blue-800 mb-2">Fase Higiénica Periodontal</h5>
-            <ul className="space-y-1">
-              {plan.fase_higienica_periodontal.profilaxis && renderPlanItem('Profilaxis', 'profilaxis')}
-              {plan.fase_higienica_periodontal.detartraje?.generalizado && renderPlanItem('Detartraje generalizado', 'detartraje-gen')}
-              {plan.fase_higienica_periodontal.detartraje?.dientes?.map((d, idx) => renderPlanItem(`Detartraje: ${formatearDienteConSuperficie(d)}`, `detartraje-${idx}`))}
-              {plan.fase_higienica_periodontal.aplicacion_fluor?.map((d, idx) => renderPlanItem(`Aplicación flúor: ${formatearDienteConSuperficie(d)}`, `fluor-${idx}`))}
-              {plan.fase_higienica_periodontal.pulido?.map((d, idx) => renderPlanItem(`Pulido: ${formatearDienteConSuperficie(d)}`, `pulido-${idx}`))}
-              {plan.fase_higienica_periodontal.raspaje_alisado_radicular?.map((d, idx) => renderPlanItem(`Raspaje y alisado radicular: ${formatearDienteConSuperficie(d)}`, `raspaje-${idx}`))}
-            </ul>
-          </div>
-        )}
-
-        {plan.fase_higienica_dental && (
-          <div>
-            <h5 className="font-semibold text-blue-800 mb-2">Fase Higiénica Dental</h5>
-            <ul className="space-y-1">
-              {plan.fase_higienica_dental.operatoria?.map((d, idx) => renderPlanItem(`Operatoria/Resina: ${formatearDienteConSuperficie(d)}`, `operatoria-${idx}`))}
-              {plan.fase_higienica_dental.exodoncias?.map((d, idx) => renderPlanItem(`Exodoncia: ${formatearDienteConSuperficie(d)}`, `exodoncia-${idx}`))}
-              {plan.fase_higienica_dental.retiro_coronas?.map((d, idx) => renderPlanItem(`Retiro corona: ${formatearDienteConSuperficie(d)}`, `retiro-corona-${idx}`))}
-              {plan.fase_higienica_dental.provisionales?.map((d, idx) => renderPlanItem(`Provisional: ${formatearDienteConSuperficie(d)}`, `provisional-${idx}`))}
-              {plan.fase_higienica_dental.rebase_provisionales?.map((d, idx) => renderPlanItem(`Rebase provisional: ${formatearDienteConSuperficie(d)}`, `rebase-prov-${idx}`))}
-              {plan.fase_higienica_dental.protesis_transicional?.superior && renderPlanItem(`Prótesis transicional superior${plan.fase_higienica_dental.protesis_transicional.dientes_reemplazar?.length > 0 ? ` (reemplaza: ${plan.fase_higienica_dental.protesis_transicional.dientes_reemplazar.join(', ')})` : ''}`, 'pt-superior')}
-              {plan.fase_higienica_dental.protesis_transicional?.inferior && renderPlanItem('Prótesis transicional inferior', 'pt-inferior')}
-              {plan.fase_higienica_dental.rebase_protesis_transicional?.superior && renderPlanItem('Rebase prótesis transicional superior', 'rebase-pt-sup')}
-              {plan.fase_higienica_dental.rebase_protesis_transicional?.inferior && renderPlanItem('Rebase prótesis transicional inferior', 'rebase-pt-inf')}
-            </ul>
-          </div>
-        )}
-
-        {plan.fase_reevaluativa && (
-          <div>
-            <h5 className="font-semibold text-blue-800 mb-2">Fase Reevaluativa</h5>
-            <ul className="space-y-1">{renderPlanItem('Reevaluación', 'reevaluacion')}</ul>
-          </div>
-        )}
-
-        {plan.fase_correctiva_inicial && (
-          <div>
-            <h5 className="font-semibold text-blue-800 mb-2">Fase Correctiva Inicial</h5>
-            <ul className="space-y-1">
-              {plan.fase_correctiva_inicial.endodoncia?.map((d, idx) => renderPlanItem(`Endodoncia: ${formatearDienteConSuperficie(d)}`, `endodoncia-${idx}`))}
-              {plan.fase_correctiva_inicial.postes?.map((d, idx) => renderPlanItem(`Poste: ${formatearDienteConSuperficie(d)}`, `poste-${idx}`))}
-              {plan.fase_correctiva_inicial.nucleos?.map((d, idx) => renderPlanItem(`Núcleo: ${formatearDienteConSuperficie(d)}`, `nucleo-${idx}`))}
-              {plan.fase_correctiva_inicial.reconstruccion_munon?.map((d, idx) => renderPlanItem(`Reconstrucción muñón: ${formatearDienteConSuperficie(d)}`, `munon-${idx}`))}
-              {plan.fase_correctiva_inicial.implantes_observacion?.map((d, idx) => renderPlanItem(`Implante (observación): ${formatearDienteConSuperficie(d)}`, `implante-${idx}`))}
-              {plan.fase_correctiva_inicial.cirugia_oral && renderPlanItem(`Cirugía oral: ${plan.fase_correctiva_inicial.cirugia_oral}`, 'cirugia-oral')}
-              {plan.fase_correctiva_inicial.ajuste_oclusal?.completo && renderPlanItem('Ajuste oclusal completo', 'ajuste-completo')}
-              {plan.fase_correctiva_inicial.ajuste_oclusal?.cuadrantes?.map((c, idx) => renderPlanItem(`Ajuste oclusal cuadrante ${c}`, `ajuste-q${idx}`))}
-            </ul>
-          </div>
-        )}
-
-        {plan.fase_correctiva_final && (
-          <div>
-            <h5 className="font-semibold text-blue-800 mb-2">Fase Correctiva Final</h5>
-            <ul className="space-y-1">
-              {plan.fase_correctiva_final.coronas?.map((c, idx) => renderPlanItem(`Corona: ${formatearCorona(c)}`, `corona-${idx}`))}
-              {plan.fase_correctiva_final.incrustaciones?.map((i, idx) => renderPlanItem(`Incrustación: ${formatearIncrustacion(i)}`, `incrustacion-${idx}`))}
-              {plan.fase_correctiva_final.protesis_removible?.superior && renderPlanItem('Prótesis removible superior', 'ppr-superior')}
-              {plan.fase_correctiva_final.protesis_removible?.inferior && renderPlanItem('Prótesis removible inferior', 'ppr-inferior')}
-              {plan.fase_correctiva_final.protesis_total?.superior && renderPlanItem('Prótesis total superior', 'pt-superior')}
-              {plan.fase_correctiva_final.protesis_total?.inferior && renderPlanItem('Prótesis total inferior', 'pt-inferior')}
-              {plan.fase_correctiva_final.protesis_fija?.map((p, idx) => renderPlanItem(`Prótesis fija: ${formatearProtesisFija(p)}`, `ppf-${idx}`))}
-              {plan.fase_correctiva_final.carillas?.map((d, idx) => renderPlanItem(`Carilla: ${formatearDienteConSuperficie(d)}`, `carilla-${idx}`))}
-            </ul>
-          </div>
-        )}
-
-        {plan.fase_mantenimiento && (
-          <div>
-            <h5 className="font-semibold text-blue-800 mb-2">Fase de Mantenimiento</h5>
-            <ul className="space-y-1">{renderPlanItem('Mantenimiento', 'mantenimiento')}</ul>
-          </div>
-        )}
-      </div>
-    );
-  };
+  // Obtener validación en tiempo real del teléfono
+  const telValidacion = validarTelefono(nuevo.celular);
 
   if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
 
@@ -680,6 +572,12 @@ const GestionPacientes = () => {
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
           <h3 className="text-lg font-bold">Pacientes ({pacientes.length})</h3>
+          <button
+            onClick={() => setMostrarFormulario(!mostrarFormulario)}
+            className="flex items-center gap-1 bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 text-sm"
+          >
+            <Plus size={16} /> Nuevo Paciente
+          </button>
           {seleccionados.length > 0 && (
             <button
               onClick={eliminarSeleccionados}
@@ -691,132 +589,176 @@ const GestionPacientes = () => {
             </button>
           )}
         </div>
-        <div className="flex gap-2">
-          <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
-            <RefreshCw size={20} />
-          </button>
-          <button
-            onClick={() => setMostrarFormulario(true)}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-          >
-            <Plus size={20} /> Nuevo
-          </button>
-        </div>
+        <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
+          <RefreshCw size={20} /> Actualizar
+        </button>
       </div>
 
-      {error && (
-        <div className="bg-red-100 text-red-700 px-4 py-2 rounded-lg mb-4 flex items-center justify-between">
-          <span>{error}</span>
-          <button onClick={() => setError('')}><X size={16} /></button>
-        </div>
-      )}
+      {error && <div className="bg-red-100 text-red-700 px-4 py-2 rounded-lg mb-4">{error}</div>}
 
       {mostrarFormulario && (
-        <div className="bg-gray-50 p-4 rounded-lg mb-4 border">
-          <h4 className="font-bold mb-3">Nuevo Paciente</h4>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <h4 className="font-bold text-blue-800 mb-3">Nuevo Paciente</h4>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            <input placeholder="Primer nombre *" value={nuevo.primer_nombre} onChange={(e) => setNuevo({...nuevo, primer_nombre: e.target.value})} className="border rounded-lg px-3 py-2" />
-            <input placeholder="Segundo nombre" value={nuevo.segundo_nombre} onChange={(e) => setNuevo({...nuevo, segundo_nombre: e.target.value})} className="border rounded-lg px-3 py-2" />
-            <input placeholder="Primer apellido *" value={nuevo.primer_apellido} onChange={(e) => setNuevo({...nuevo, primer_apellido: e.target.value})} className="border rounded-lg px-3 py-2" />
-            <input placeholder="Segundo apellido" value={nuevo.segundo_apellido} onChange={(e) => setNuevo({...nuevo, segundo_apellido: e.target.value})} className="border rounded-lg px-3 py-2" />
-            <input placeholder="Cédula *" value={nuevo.cedula} onChange={(e) => setNuevo({...nuevo, cedula: e.target.value})} className="border rounded-lg px-3 py-2" />
-            <input placeholder="Teléfono *" value={nuevo.celular} onChange={(e) => setNuevo({...nuevo, celular: e.target.value})} className="border rounded-lg px-3 py-2" />
-            <select value={nuevo.estudiante_actual_id} onChange={(e) => setNuevo({...nuevo, estudiante_actual_id: e.target.value})} className="border rounded-lg px-3 py-2">
-              <option value="">Asignar estudiante *</option>
-              {estudiantes.map(e => (<option key={e.id} value={e.id}>{e.nombre_completo}</option>))}
+            <input
+              type="text"
+              placeholder="Primer nombre *"
+              value={nuevo.primer_nombre}
+              onChange={(e) => setNuevo({...nuevo, primer_nombre: e.target.value})}
+              className="border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              placeholder="Segundo nombre"
+              value={nuevo.segundo_nombre}
+              onChange={(e) => setNuevo({...nuevo, segundo_nombre: e.target.value})}
+              className="border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              placeholder="Primer apellido *"
+              value={nuevo.primer_apellido}
+              onChange={(e) => setNuevo({...nuevo, primer_apellido: e.target.value})}
+              className="border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              placeholder="Segundo apellido"
+              value={nuevo.segundo_apellido}
+              onChange={(e) => setNuevo({...nuevo, segundo_apellido: e.target.value})}
+              className="border rounded px-3 py-2"
+            />
+            <input
+              type="text"
+              placeholder="Cédula *"
+              value={nuevo.cedula}
+              onChange={(e) => setNuevo({...nuevo, cedula: e.target.value.replace(/\D/g, '')})}
+              className="border rounded px-3 py-2"
+            />
+            <div>
+              <input
+                type="text"
+                placeholder="Teléfono * (cel: 10 dígitos, fijo: 7)"
+                value={nuevo.celular}
+                onChange={(e) => setNuevo({...nuevo, celular: e.target.value.replace(/\D/g, '')})}
+                className={`border rounded px-3 py-2 w-full ${
+                  nuevo.celular && !telValidacion.valido ? 'border-red-500' : 
+                  nuevo.celular && telValidacion.valido ? 'border-green-500' : ''
+                }`}
+              />
+              {nuevo.celular && (
+                <p className={`text-xs mt-1 ${telValidacion.valido ? 'text-green-600' : 'text-red-600'}`}>
+                  {telValidacion.valido 
+                    ? `${telValidacion.tipo === 'celular' ? '📱 Celular' : '📞 Fijo'}: ${formatearTelefono(nuevo.celular)}`
+                    : 'Celular: 10 dígitos (3xx). Fijo: 7 dígitos'
+                  }
+                </p>
+              )}
+            </div>
+            <select
+              value={nuevo.estudiante_actual_id}
+              onChange={(e) => setNuevo({...nuevo, estudiante_actual_id: e.target.value})}
+              className="border rounded px-3 py-2"
+            >
+              <option value="">Asignar a estudiante *</option>
+              {estudiantes.map(e => (
+                <option key={e.id} value={e.id}>{e.nombre_completo}</option>
+              ))}
             </select>
           </div>
           <div className="flex gap-2 mt-3">
-            <button onClick={crearPaciente} className="flex items-center gap-1 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-              <Save size={18} /> Guardar
+            <button
+              onClick={crearPaciente}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 flex items-center gap-1"
+            >
+              <Save size={16} /> Guardar
             </button>
-            <button onClick={() => { setMostrarFormulario(false); setError(''); }} className="flex items-center gap-1 bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
-              <X size={18} /> Cancelar
+            <button
+              onClick={() => { setMostrarFormulario(false); setError(''); }}
+              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 flex items-center gap-1"
+            >
+              <X size={16} /> Cancelar
             </button>
           </div>
         </div>
       )}
 
       <div className="mb-4">
-        <input type="text" placeholder="Buscar por nombre o cédula..." value={filtro} onChange={(e) => setFiltro(e.target.value)} className="w-full md:w-96 border rounded-lg px-4 py-2" />
+        <input
+          type="text"
+          placeholder="Buscar por nombre o cédula..."
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+          className="w-full md:w-96 border rounded-lg px-4 py-2"
+        />
       </div>
 
-      <div className="space-y-2">
-        {pacientesFiltrados.map((p) => {
-          const isExpanded = pacienteExpandido === p.id;
-          const planes = p.planes_tratamiento || [];
-          const planActivo = planes.find(pl => pl.estado === 'aprobado' && !pl.fecha_finalizacion);
-          const planFormateado = planActivo ? formatearPlan(planActivo.plan_completo) : null;
-
-          return (
-            <div key={p.id} className="border rounded-lg overflow-hidden bg-white">
-              <div
-                onClick={() => setPacienteExpandido(isExpanded ? null : p.id)}
-                className={`p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between ${seleccionados.includes(p.id) ? 'bg-red-50' : ''}`}
-              >
-                <div className="flex items-center gap-4">
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="p-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={seleccionados.length === pacientesFiltrados.length && pacientesFiltrados.length > 0}
+                  onChange={toggleTodos}
+                  className="w-4 h-4 cursor-pointer"
+                />
+              </th>
+              <th className="text-left p-3 font-semibold">Paciente</th>
+              <th className="text-left p-3 font-semibold">Cédula</th>
+              <th className="text-left p-3 font-semibold">Teléfono</th>
+              <th className="text-left p-3 font-semibold">Estudiante Asignado</th>
+              <th className="text-left p-3 font-semibold">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pacientesFiltrados.map((p) => (
+              <tr key={p.id} className={`border-b hover:bg-gray-50 ${seleccionados.includes(p.id) ? 'bg-red-50' : ''}`}>
+                <td className="p-3">
                   <input
                     type="checkbox"
                     checked={seleccionados.includes(p.id)}
-                    onChange={(e) => { e.stopPropagation(); toggleSeleccion(p.id); }}
+                    onChange={() => toggleSeleccion(p.id)}
                     className="w-4 h-4 cursor-pointer"
                   />
-                  <div>
-                    <div className="font-medium">
-                      {p.primer_nombre} {p.segundo_nombre || ''} {p.primer_apellido} {p.segundo_apellido || ''}
-                    </div>
-                    <div className="text-sm text-gray-500">CC: {p.cedula} · Tel: {formatearTelefono(p.celular)}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-sm text-right">
-                    <div className="text-gray-600">{p.usuarios?.nombre_completo || 'Sin asignar'}</div>
-                    {planes.length > 0 && (
-                      <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">{planes.length} plan{planes.length > 1 ? 'es' : ''}</span>
-                    )}
-                  </div>
-                  {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                </div>
-              </div>
-
-              {isExpanded && (
-                <div className="border-t px-4 py-3 bg-gray-50">
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label className="text-sm text-gray-500">Estudiante asignado:</label>
-                      <select
-                        value={p.estudiante_actual_id || ''}
-                        onChange={(e) => cambiarEstudiante(p.id, e.target.value)}
-                        className="w-full border rounded px-2 py-1 text-sm mt-1"
-                      >
-                        <option value="">Sin asignar</option>
-                        {estudiantes.map(e => (<option key={e.id} value={e.id}>{e.nombre_completo}</option>))}
-                      </select>
-                    </div>
-                    <div className="flex items-end justify-end">
-                      <button onClick={() => eliminarPaciente(p.id)} className="text-red-600 hover:text-red-800 flex items-center gap-1 text-sm">
-                        <Trash2 size={16} /> Eliminar paciente
-                      </button>
-                    </div>
-                  </div>
-
-                  {planes.length === 0 ? (
-                    <p className="text-gray-500 text-sm italic">Este paciente no tiene plan de tratamiento.</p>
-                  ) : (
-                    <div>
-                      <h4 className="font-medium text-gray-700 mb-2">Plan de Tratamiento Activo:</h4>
-                      {planFormateado ? renderPlan(planFormateado) : <p className="text-gray-500 text-sm italic">No hay plan activo.</p>}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                </td>
+                <td className="p-3">
+                  {p.primer_nombre} {p.segundo_nombre || ''} {p.primer_apellido} {p.segundo_apellido || ''}
+                </td>
+                <td className="p-3">{p.cedula}</td>
+                <td className="p-3">{formatearTelefono(p.celular)}</td>
+                <td className="p-3">
+                  <select
+                    value={p.estudiante_actual_id || ''}
+                    onChange={(e) => cambiarEstudiante(p.id, e.target.value)}
+                    className="border rounded px-2 py-1 text-sm w-full"
+                  >
+                    <option value="">Sin asignar</option>
+                    {estudiantes.map(e => (
+                      <option key={e.id} value={e.id}>{e.nombre_completo}</option>
+                    ))}
+                  </select>
+                </td>
+                <td className="p-3 text-center">
+                  <button
+                    onClick={() => eliminarPaciente(p.id)}
+                    className="text-red-600 hover:text-red-800"
+                    title="Eliminar paciente"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {pacientesFiltrados.length === 0 && (
-        <div className="text-center py-8 text-gray-500">No se encontraron pacientes</div>
+        <div className="text-center py-8 text-gray-500">
+          No se encontraron pacientes
+        </div>
       )}
     </div>
   );
@@ -853,7 +795,8 @@ const GestionCitas = () => {
   };
 
   const convertirMesParaSheets = (mesNum) => {
-    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    const meses = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
     return meses[mesNum - 1];
   };
 
@@ -895,9 +838,11 @@ const GestionCitas = () => {
   };
 
   const eliminarCita = async (id) => {
-    if (!window.confirm('¿Eliminar esta cita permanentemente?')) return;
+    if (!window.confirm('¿Eliminar esta cita permanentemente? Esta acción no se puede deshacer.')) return;
     try {
-      await supabaseFetch(`citas?id=eq.${id}`, { method: 'DELETE' });
+      await supabaseFetch(`citas?id=eq.${id}`, {
+        method: 'DELETE'
+      });
       cargar();
     } catch (err) {
       console.error('Error eliminando cita:', err);
@@ -912,7 +857,9 @@ const GestionCitas = () => {
     }
     if (!window.confirm(`¿Eliminar ${canceladas.length} citas canceladas permanentemente?`)) return;
     try {
-      await supabaseFetch(`citas?estado=eq.cancelada`, { method: 'DELETE' });
+      await supabaseFetch(`citas?estado=eq.cancelada`, {
+        method: 'DELETE'
+      });
       cargar();
     } catch (err) {
       console.error('Error eliminando citas:', err);
@@ -922,6 +869,7 @@ const GestionCitas = () => {
   const eliminarSeleccionados = async () => {
     if (seleccionados.length === 0) return;
     if (!window.confirm(`¿Eliminar ${seleccionados.length} citas permanentemente?`)) return;
+    
     setEliminando(true);
     try {
       for (const id of seleccionados) {
@@ -937,7 +885,9 @@ const GestionCitas = () => {
   };
 
   const toggleSeleccion = (id) => {
-    setSeleccionados(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    setSeleccionados(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
   };
 
   const toggleTodos = () => {
@@ -948,47 +898,52 @@ const GestionCitas = () => {
     }
   };
 
-  const sincronizarCita = async (cita) => {
+  const reintentarSheets = async (cita) => {
     setSincronizando(cita.id);
     try {
-      const [year, month, day] = cita.fecha_cita.split('-');
-      const payload = {
-        action: 'agregarCita',
-        mes: convertirMesParaSheets(parseInt(month)),
-        datos: {
-          fecha: `${day}/${month}/${year}`,
-          hora: convertirHoraParaSheets(cita.hora),
-          estudiante: cita.usuarios?.nombre_completo || '',
-          correo: cita.usuarios?.correo || '',
-          paciente: `${cita.pacientes?.primer_nombre || ''} ${cita.pacientes?.primer_apellido || ''}`.trim(),
-          cedula: cita.pacientes?.cedula || '',
-          celular: cita.pacientes?.celular || ''
-        }
-      };
-
-      const response = await fetch(SHEETS_API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify(payload)
+      const [anio, mes, dia] = cita.fecha_cita.split('-');
+      
+      const params = new URLSearchParams({
+        action: 'crear',
+        correo: cita.usuarios?.correo?.toLowerCase() || '',
+        primerNombre: cita.pacientes?.primer_nombre || '',
+        segundoNombre: cita.pacientes?.segundo_nombre || '',
+        primerApellido: cita.pacientes?.primer_apellido || '',
+        segundoApellido: cita.pacientes?.segundo_apellido || '',
+        cedula: cita.pacientes?.cedula || '',
+        celular: cita.pacientes?.celular || '',
+        diaClinica: cita.dia_clinica,
+        fechaDia: parseInt(dia, 10).toString(),
+        fechaMes: convertirMesParaSheets(parseInt(mes, 10)),
+        fechaAnio: anio,
+        hora: convertirHoraParaSheets(cita.hora),
+        tratamiento: cita.tratamiento_programado || '',
+        observacion: cita.observacion || ''
       });
 
+      const response = await fetch(`${SHEETS_API_URL}?${params}`);
       const result = await response.json();
-      if (result.success) {
+
+      if (result && result.ok) {
         await supabaseFetch(`citas?id=eq.${cita.id}`, {
           method: 'PATCH',
           body: JSON.stringify({ sincronizado_sheets: true })
         });
+        alert('✅ Sincronizado con Google Sheets');
         cargar();
       } else {
-        alert('Error al sincronizar: ' + (result.error || 'Error desconocido'));
+        alert('❌ Error al sincronizar: ' + (result?.error || 'Sin respuesta'));
       }
     } catch (err) {
       console.error('Error sincronizando:', err);
-      alert('Error de conexión al sincronizar');
+      alert('❌ Error de conexión con Google Sheets');
     } finally {
       setSincronizando(null);
     }
   };
+
+  const citasSinSincronizar = citas.filter(c => c.estado === 'programada' && !c.sincronizado_sheets).length;
+  const citasCanceladas = citas.filter(c => c.estado === 'cancelada').length;
 
   if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
 
@@ -996,33 +951,65 @@ const GestionCitas = () => {
     <div>
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
-          <h3 className="text-lg font-bold">Citas ({citas.length})</h3>
+          <h3 className="text-lg font-bold">Citas Programadas ({citas.length})</h3>
           {seleccionados.length > 0 && (
-            <button onClick={eliminarSeleccionados} disabled={eliminando} className="flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm disabled:bg-gray-400">
+            <button
+              onClick={eliminarSeleccionados}
+              disabled={eliminando}
+              className="flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm disabled:bg-gray-400"
+            >
               {eliminando ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
               Eliminar ({seleccionados.length})
             </button>
           )}
         </div>
-        <div className="flex gap-2">
-          <button onClick={eliminarTodasCanceladas} className="flex items-center gap-2 text-red-600 hover:text-red-800 text-sm">
-            <Trash2 size={16} /> Limpiar canceladas
-          </button>
+        <div className="flex items-center gap-2">
+          {citasCanceladas > 0 && (
+            <button 
+              onClick={eliminarTodasCanceladas}
+              className="flex items-center gap-1 text-red-600 hover:text-red-800 text-sm"
+            >
+              <Trash2 size={16} /> Eliminar canceladas ({citasCanceladas})
+            </button>
+          )}
           <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
-            <RefreshCw size={20} />
+            <RefreshCw size={20} /> Actualizar
           </button>
         </div>
       </div>
 
-      <div className="flex gap-4 mb-4">
-        <input type="date" value={filtroFecha} onChange={(e) => setFiltroFecha(e.target.value)} className="border rounded-lg px-4 py-2" />
-        <select value={filtroEstudiante} onChange={(e) => setFiltroEstudiante(e.target.value)} className="border rounded-lg px-4 py-2">
+      {citasSinSincronizar > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 flex items-center gap-2">
+          <AlertTriangle className="text-yellow-600" size={20} />
+          <span className="text-yellow-800 text-sm">
+            {citasSinSincronizar} cita(s) no sincronizada(s) con Google Sheets
+          </span>
+        </div>
+      )}
+
+      <div className="flex gap-4 mb-4 flex-wrap">
+        <select
+          value={filtroEstudiante}
+          onChange={(e) => setFiltroEstudiante(e.target.value)}
+          className="border rounded-lg px-4 py-2"
+        >
           <option value="">Todos los estudiantes</option>
-          {estudiantes.map(e => (<option key={e.id} value={e.id}>{e.nombre_completo}</option>))}
+          {estudiantes.map(e => (
+            <option key={e.id} value={e.id}>{e.nombre_completo}</option>
+          ))}
         </select>
-        {(filtroFecha || filtroEstudiante) && (
-          <button onClick={() => { setFiltroFecha(''); setFiltroEstudiante(''); }} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
+        <input
+          type="date"
+          value={filtroFecha}
+          onChange={(e) => setFiltroFecha(e.target.value)}
+          className="border rounded-lg px-4 py-2"
+        />
+        {(filtroEstudiante || filtroFecha) && (
+          <button
+            onClick={() => { setFiltroEstudiante(''); setFiltroFecha(''); }}
+            className="text-gray-500 hover:text-gray-700 flex items-center gap-1"
+          >
+            <X size={16} /> Limpiar filtros
           </button>
         )}
       </div>
@@ -1032,12 +1019,18 @@ const GestionCitas = () => {
           <thead>
             <tr className="bg-gray-100">
               <th className="p-3 w-10">
-                <input type="checkbox" checked={seleccionados.length === citasFiltradas.length && citasFiltradas.length > 0} onChange={toggleTodos} className="w-4 h-4 cursor-pointer" />
+                <input
+                  type="checkbox"
+                  checked={seleccionados.length === citasFiltradas.length && citasFiltradas.length > 0}
+                  onChange={toggleTodos}
+                  className="w-4 h-4 cursor-pointer"
+                />
               </th>
               <th className="text-left p-3 font-semibold">Fecha</th>
               <th className="text-left p-3 font-semibold">Hora</th>
               <th className="text-left p-3 font-semibold">Paciente</th>
               <th className="text-left p-3 font-semibold">Estudiante</th>
+              <th className="text-left p-3 font-semibold">Tratamiento</th>
               <th className="text-center p-3 font-semibold">Estado</th>
               <th className="text-center p-3 font-semibold">Sheets</th>
               <th className="text-center p-3 font-semibold">Acciones</th>
@@ -1045,45 +1038,71 @@ const GestionCitas = () => {
           </thead>
           <tbody>
             {citasFiltradas.map((c) => (
-              <tr key={c.id} className={`border-b hover:bg-gray-50 ${seleccionados.includes(c.id) ? 'bg-red-50' : ''}`}>
+              <tr key={c.id} className={`border-b hover:bg-gray-50 ${seleccionados.includes(c.id) ? 'bg-red-50' : !c.sincronizado_sheets && c.estado === 'programada' ? 'bg-yellow-50' : ''}`}>
                 <td className="p-3">
-                  <input type="checkbox" checked={seleccionados.includes(c.id)} onChange={() => toggleSeleccion(c.id)} className="w-4 h-4 cursor-pointer" />
+                  <input
+                    type="checkbox"
+                    checked={seleccionados.includes(c.id)}
+                    onChange={() => toggleSeleccion(c.id)}
+                    className="w-4 h-4 cursor-pointer"
+                  />
                 </td>
-                <td className="p-3">{new Date(c.fecha_cita + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short' })}</td>
+                <td className="p-3">
+                  {new Date(c.fecha_cita + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })}
+                </td>
                 <td className="p-3">{formatearHora(c.hora)}</td>
                 <td className="p-3">
-                  <div>{c.pacientes?.primer_nombre} {c.pacientes?.primer_apellido}</div>
-                  <div className="text-xs text-gray-500">{c.pacientes?.cedula}</div>
+                  {c.pacientes?.primer_nombre} {c.pacientes?.primer_apellido}
+                  <span className="text-xs text-gray-500 block">CC: {c.pacientes?.cedula}</span>
                 </td>
-                <td className="p-3 text-sm">{c.usuarios?.nombre_completo || 'Sin asignar'}</td>
+                <td className="p-3 text-sm">{c.usuarios?.nombre_completo}</td>
+                <td className="p-3 text-sm">{c.tratamiento_programado}</td>
                 <td className="p-3 text-center">
                   <span className={`px-2 py-1 rounded text-xs font-medium ${
                     c.estado === 'programada' ? 'bg-blue-100 text-blue-700' :
                     c.estado === 'completada' ? 'bg-green-100 text-green-700' :
-                    c.estado === 'cancelada' ? 'bg-red-100 text-red-700' :
-                    'bg-gray-100 text-gray-700'
+                    'bg-red-100 text-red-700'
                   }`}>
                     {c.estado}
                   </span>
                 </td>
                 <td className="p-3 text-center">
-                  {c.sincronizado_sheets ? (
-                    <CheckCircle size={18} className="text-green-600 mx-auto" />
-                  ) : (
-                    <button onClick={() => sincronizarCita(c)} disabled={sincronizando === c.id} className="text-yellow-600 hover:text-yellow-800" title="Sincronizar con Sheets">
-                      {sincronizando === c.id ? <Loader2 size={18} className="animate-spin" /> : <RefreshCw size={18} />}
-                    </button>
+                  {c.estado === 'programada' && (
+                    c.sincronizado_sheets ? (
+                      <CheckCircle size={18} className="text-green-600 mx-auto" title="Sincronizado" />
+                    ) : (
+                      <button
+                        onClick={() => reintentarSheets(c)}
+                        disabled={sincronizando === c.id}
+                        className="text-yellow-600 hover:text-yellow-800"
+                        title="Reintentar sincronización"
+                      >
+                        {sincronizando === c.id ? (
+                          <Loader2 size={18} className="animate-spin" />
+                        ) : (
+                          <AlertTriangle size={18} />
+                        )}
+                      </button>
+                    )
                   )}
                 </td>
                 <td className="p-3 text-center">
-                  <div className="flex justify-center gap-2">
+                  <div className="flex items-center justify-center gap-1">
                     {c.estado === 'programada' && (
-                      <button onClick={() => cancelarCita(c.id)} className="text-yellow-600 hover:text-yellow-800" title="Cancelar">
+                      <button
+                        onClick={() => cancelarCita(c.id)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Cancelar cita"
+                      >
                         <XCircle size={18} />
                       </button>
                     )}
                     {c.estado === 'cancelada' && (
-                      <button onClick={() => eliminarCita(c.id)} className="text-red-600 hover:text-red-800" title="Eliminar">
+                      <button
+                        onClick={() => eliminarCita(c.id)}
+                        className="text-red-600 hover:text-red-800"
+                        title="Eliminar permanentemente"
+                      >
                         <Trash2 size={18} />
                       </button>
                     )}
@@ -1096,7 +1115,9 @@ const GestionCitas = () => {
       </div>
 
       {citasFiltradas.length === 0 && (
-        <div className="text-center py-8 text-gray-500">No se encontraron citas</div>
+        <div className="text-center py-8 text-gray-500">
+          No se encontraron citas
+        </div>
       )}
     </div>
   );
@@ -1111,13 +1132,14 @@ const GestionPlanes = () => {
   const [filtro, setFiltro] = useState('');
   const [seleccionados, setSeleccionados] = useState([]);
   const [eliminando, setEliminando] = useState(false);
-  const [planExpandido, setPlanExpandido] = useState(null);
+  const [abandonando, setAbandonando] = useState(null);
+  const [motivoAbandono, setMotivoAbandono] = useState('');
 
   const cargar = async () => {
     setCargando(true);
     try {
       const data = await supabaseFetch(
-        'planes_tratamiento?select=*,pacientes(primer_nombre,primer_apellido,segundo_nombre,segundo_apellido,cedula),usuarios!planes_tratamiento_estudiante_id_fkey(nombre_completo)&order=created_at.desc'
+        'planes_tratamiento?select=*,pacientes(primer_nombre,primer_apellido,cedula),usuarios:estudiante_id(nombre_completo)&order=created_at.desc'
       );
       setPlanes(data || []);
     } catch (err) {
@@ -1148,6 +1170,7 @@ const GestionPlanes = () => {
   const eliminarSeleccionados = async () => {
     if (seleccionados.length === 0) return;
     if (!window.confirm(`¿Eliminar ${seleccionados.length} planes de tratamiento?`)) return;
+    
     setEliminando(true);
     try {
       for (const id of seleccionados) {
@@ -1162,153 +1185,62 @@ const GestionPlanes = () => {
     }
   };
 
-  const toggleSeleccion = (id) => {
-    setSeleccionados(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  };
+  const marcarAbandonado = async (planId) => {
+    if (!motivoAbandono.trim()) {
+      alert('Por favor indica el motivo del abandono');
+      return;
+    }
 
-  //const toggleTodos = () => {
-  //  if (seleccionados.length === planesFiltrados.length) {
-  //    setSeleccionados([]);
-  //  } else {
-  //    setSeleccionados(planesFiltrados.map(p => p.id));
-  //  }
- // };
-
-  // Funciones para renderizar plan
-  const formatearPlan = (planCompleto) => {
-    if (!planCompleto) return null;
     try {
-      return typeof planCompleto === 'string' ? JSON.parse(planCompleto) : planCompleto;
-    } catch {
-      return null;
+      await supabaseFetch(`planes_tratamiento?id=eq.${planId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          estado: 'abandonado',
+          fecha_cierre: new Date().toISOString(),
+          motivo_cierre: motivoAbandono
+        })
+      });
+      setAbandonando(null);
+      setMotivoAbandono('');
+      cargar();
+    } catch (err) {
+      console.error('Error al marcar como abandonado:', err);
+      alert('Error al actualizar el plan');
     }
   };
 
-  const formatearDienteConSuperficie = (item) => {
-    if (typeof item === 'object' && item !== null) {
-      if (item.superficies) return `${item.diente} (${item.superficies})`;
-      if (item.superficie) return `${item.diente} (${item.superficie})`;
-      return item.diente;
-    }
-    return item;
-  };
-
-  const formatearCorona = (item) => {
-    if (typeof item === 'object' && item !== null) {
-      return `${item.diente}${item.tipo ? ` (${item.tipo})` : ''}`;
-    }
-    return item;
-  };
-
-  const formatearIncrustacion = (item) => {
-    if (typeof item === 'object' && item !== null) {
-      let texto = `${item.diente}`;
-      const detalles = [];
-      if (item.tipo_pieza) detalles.push(item.tipo_pieza);
-      if (item.material) detalles.push(item.material);
-      if (detalles.length > 0) texto += ` (${detalles.join(', ')})`;
-      return texto;
-    }
-    return item;
-  };
-
-  const formatearProtesisFija = (item) => {
-    if (typeof item === 'object' && item !== null) {
-      return `Tramo ${item.tramo}${item.tipo ? ` (${item.tipo})` : ''}`;
-    }
-    return item;
-  };
-
-  const renderPlanItem = (texto, key) => (
-    <li key={key} className="flex items-center gap-2 text-gray-700">
-      <span className="w-4 h-4 border border-gray-300 rounded-full flex-shrink-0"></span>
-      <span>{texto}</span>
-    </li>
-  );
-
-  const renderPlan = (plan) => {
-    if (!plan) return <p className="text-gray-500 text-sm">Sin detalle de plan</p>;
-
-    return (
-      <div className="space-y-4 text-sm">
-        {plan.fase_higienica_periodontal && (
-          <div>
-            <h5 className="font-semibold text-blue-800 mb-2">Fase Higiénica Periodontal</h5>
-            <ul className="space-y-1">
-              {plan.fase_higienica_periodontal.profilaxis && renderPlanItem('Profilaxis', 'profilaxis')}
-              {plan.fase_higienica_periodontal.detartraje?.generalizado && renderPlanItem('Detartraje generalizado', 'detartraje-gen')}
-              {plan.fase_higienica_periodontal.detartraje?.dientes?.map((d, idx) => renderPlanItem(`Detartraje: ${formatearDienteConSuperficie(d)}`, `detartraje-${idx}`))}
-              {plan.fase_higienica_periodontal.aplicacion_fluor?.map((d, idx) => renderPlanItem(`Aplicación flúor: ${formatearDienteConSuperficie(d)}`, `fluor-${idx}`))}
-              {plan.fase_higienica_periodontal.pulido?.map((d, idx) => renderPlanItem(`Pulido: ${formatearDienteConSuperficie(d)}`, `pulido-${idx}`))}
-              {plan.fase_higienica_periodontal.raspaje_alisado_radicular?.map((d, idx) => renderPlanItem(`Raspaje y alisado radicular: ${formatearDienteConSuperficie(d)}`, `raspaje-${idx}`))}
-            </ul>
-          </div>
-        )}
-
-        {plan.fase_higienica_dental && (
-          <div>
-            <h5 className="font-semibold text-blue-800 mb-2">Fase Higiénica Dental</h5>
-            <ul className="space-y-1">
-              {plan.fase_higienica_dental.operatoria?.map((d, idx) => renderPlanItem(`Operatoria/Resina: ${formatearDienteConSuperficie(d)}`, `operatoria-${idx}`))}
-              {plan.fase_higienica_dental.exodoncias?.map((d, idx) => renderPlanItem(`Exodoncia: ${formatearDienteConSuperficie(d)}`, `exodoncia-${idx}`))}
-              {plan.fase_higienica_dental.retiro_coronas?.map((d, idx) => renderPlanItem(`Retiro corona: ${formatearDienteConSuperficie(d)}`, `retiro-corona-${idx}`))}
-              {plan.fase_higienica_dental.provisionales?.map((d, idx) => renderPlanItem(`Provisional: ${formatearDienteConSuperficie(d)}`, `provisional-${idx}`))}
-              {plan.fase_higienica_dental.rebase_provisionales?.map((d, idx) => renderPlanItem(`Rebase provisional: ${formatearDienteConSuperficie(d)}`, `rebase-prov-${idx}`))}
-              {plan.fase_higienica_dental.protesis_transicional?.superior && renderPlanItem(`Prótesis transicional superior${plan.fase_higienica_dental.protesis_transicional.dientes_reemplazar?.length > 0 ? ` (reemplaza: ${plan.fase_higienica_dental.protesis_transicional.dientes_reemplazar.join(', ')})` : ''}`, 'pt-superior')}
-              {plan.fase_higienica_dental.protesis_transicional?.inferior && renderPlanItem('Prótesis transicional inferior', 'pt-inferior')}
-              {plan.fase_higienica_dental.rebase_protesis_transicional?.superior && renderPlanItem('Rebase prótesis transicional superior', 'rebase-pt-sup')}
-              {plan.fase_higienica_dental.rebase_protesis_transicional?.inferior && renderPlanItem('Rebase prótesis transicional inferior', 'rebase-pt-inf')}
-            </ul>
-          </div>
-        )}
-
-        {plan.fase_reevaluativa && (
-          <div>
-            <h5 className="font-semibold text-blue-800 mb-2">Fase Reevaluativa</h5>
-            <ul className="space-y-1">{renderPlanItem('Reevaluación', 'reevaluacion')}</ul>
-          </div>
-        )}
-
-        {plan.fase_correctiva_inicial && (
-          <div>
-            <h5 className="font-semibold text-blue-800 mb-2">Fase Correctiva Inicial</h5>
-            <ul className="space-y-1">
-              {plan.fase_correctiva_inicial.endodoncia?.map((d, idx) => renderPlanItem(`Endodoncia: ${formatearDienteConSuperficie(d)}`, `endodoncia-${idx}`))}
-              {plan.fase_correctiva_inicial.postes?.map((d, idx) => renderPlanItem(`Poste: ${formatearDienteConSuperficie(d)}`, `poste-${idx}`))}
-              {plan.fase_correctiva_inicial.nucleos?.map((d, idx) => renderPlanItem(`Núcleo: ${formatearDienteConSuperficie(d)}`, `nucleo-${idx}`))}
-              {plan.fase_correctiva_inicial.reconstruccion_munon?.map((d, idx) => renderPlanItem(`Reconstrucción muñón: ${formatearDienteConSuperficie(d)}`, `munon-${idx}`))}
-              {plan.fase_correctiva_inicial.implantes_observacion?.map((d, idx) => renderPlanItem(`Implante (observación): ${formatearDienteConSuperficie(d)}`, `implante-${idx}`))}
-              {plan.fase_correctiva_inicial.cirugia_oral && renderPlanItem(`Cirugía oral: ${plan.fase_correctiva_inicial.cirugia_oral}`, 'cirugia-oral')}
-              {plan.fase_correctiva_inicial.ajuste_oclusal?.completo && renderPlanItem('Ajuste oclusal completo', 'ajuste-completo')}
-              {plan.fase_correctiva_inicial.ajuste_oclusal?.cuadrantes?.map((c, idx) => renderPlanItem(`Ajuste oclusal cuadrante ${c}`, `ajuste-q${idx}`))}
-            </ul>
-          </div>
-        )}
-
-        {plan.fase_correctiva_final && (
-          <div>
-            <h5 className="font-semibold text-blue-800 mb-2">Fase Correctiva Final</h5>
-            <ul className="space-y-1">
-              {plan.fase_correctiva_final.coronas?.map((c, idx) => renderPlanItem(`Corona: ${formatearCorona(c)}`, `corona-${idx}`))}
-              {plan.fase_correctiva_final.incrustaciones?.map((i, idx) => renderPlanItem(`Incrustación: ${formatearIncrustacion(i)}`, `incrustacion-${idx}`))}
-              {plan.fase_correctiva_final.protesis_removible?.superior && renderPlanItem('Prótesis removible superior', 'ppr-superior')}
-              {plan.fase_correctiva_final.protesis_removible?.inferior && renderPlanItem('Prótesis removible inferior', 'ppr-inferior')}
-              {plan.fase_correctiva_final.protesis_total?.superior && renderPlanItem('Prótesis total superior', 'pt-superior')}
-              {plan.fase_correctiva_final.protesis_total?.inferior && renderPlanItem('Prótesis total inferior', 'pt-inferior')}
-              {plan.fase_correctiva_final.protesis_fija?.map((p, idx) => renderPlanItem(`Prótesis fija: ${formatearProtesisFija(p)}`, `ppf-${idx}`))}
-              {plan.fase_correctiva_final.carillas?.map((d, idx) => renderPlanItem(`Carilla: ${formatearDienteConSuperficie(d)}`, `carilla-${idx}`))}
-            </ul>
-          </div>
-        )}
-
-        {plan.fase_mantenimiento && (
-          <div>
-            <h5 className="font-semibold text-blue-800 mb-2">Fase de Mantenimiento</h5>
-            <ul className="space-y-1">{renderPlanItem('Mantenimiento', 'mantenimiento')}</ul>
-          </div>
-        )}
-      </div>
+  const toggleSeleccion = (id) => {
+    setSeleccionados(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
+  };
+
+  const toggleTodos = () => {
+    if (seleccionados.length === planesFiltrados.length) {
+      setSeleccionados([]);
+    } else {
+      setSeleccionados(planesFiltrados.map(p => p.id));
+    }
+  };
+
+  const getEstadoStyle = (estado) => {
+    switch (estado) {
+      case 'aprobado': return 'bg-green-100 text-green-700';
+      case 'pendiente_aprobacion': return 'bg-yellow-100 text-yellow-700';
+      case 'finalizado': return 'bg-blue-100 text-blue-700';
+      case 'abandonado': return 'bg-gray-100 text-gray-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const getEstadoLabel = (estado) => {
+    switch (estado) {
+      case 'aprobado': return 'Activo';
+      case 'pendiente_aprobacion': return 'Pendiente';
+      case 'finalizado': return '✓ Finalizado';
+      case 'abandonado': return '✗ Abandonado';
+      default: return estado;
+    }
   };
 
   if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
@@ -1319,7 +1251,11 @@ const GestionPlanes = () => {
         <div className="flex items-center gap-4">
           <h3 className="text-lg font-bold">Planes de Tratamiento ({planes.length})</h3>
           {seleccionados.length > 0 && (
-            <button onClick={eliminarSeleccionados} disabled={eliminando} className="flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm disabled:bg-gray-400">
+            <button
+              onClick={eliminarSeleccionados}
+              disabled={eliminando}
+              className="flex items-center gap-1 bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm disabled:bg-gray-400"
+            >
               {eliminando ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
               Eliminar ({seleccionados.length})
             </button>
@@ -1331,70 +1267,132 @@ const GestionPlanes = () => {
       </div>
 
       <div className="mb-4">
-        <input type="text" placeholder="Buscar por paciente o cédula..." value={filtro} onChange={(e) => setFiltro(e.target.value)} className="w-full md:w-96 border rounded-lg px-4 py-2" />
+        <input
+          type="text"
+          placeholder="Buscar por paciente o cédula..."
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+          className="w-full md:w-96 border rounded-lg px-4 py-2"
+        />
       </div>
 
-      <div className="space-y-2">
-        {planesFiltrados.map((p) => {
-          const isExpanded = planExpandido === p.id;
-          const planFormateado = formatearPlan(p.plan_completo);
-
-          return (
-            <div key={p.id} className={`border rounded-lg overflow-hidden bg-white ${seleccionados.includes(p.id) ? 'bg-red-50' : ''}`}>
-              <div
-                onClick={() => setPlanExpandido(isExpanded ? null : p.id)}
-                className="p-4 cursor-pointer hover:bg-gray-50 flex items-center justify-between"
+      {/* Modal de abandono */}
+      {abandonando && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h4 className="text-lg font-bold mb-4">Marcar plan como abandonado</h4>
+            <p className="text-gray-600 mb-4">
+              El paciente no continuará con el tratamiento. Esta acción es permanente.
+            </p>
+            <textarea
+              value={motivoAbandono}
+              onChange={(e) => setMotivoAbandono(e.target.value)}
+              placeholder="Motivo del abandono (ej: Paciente no regresó después de la fase higiénica)..."
+              className="w-full border rounded-lg px-3 py-2 h-24 resize-none mb-4"
+              autoFocus
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setAbandonando(null); setMotivoAbandono(''); }}
+                className="px-4 py-2 text-gray-600 hover:text-gray-800"
               >
-                <div className="flex items-center gap-4">
+                Cancelar
+              </button>
+              <button
+                onClick={() => marcarAbandonado(abandonando)}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Confirmar abandono
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="p-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={seleccionados.length === planesFiltrados.length && planesFiltrados.length > 0}
+                  onChange={toggleTodos}
+                  className="w-4 h-4 cursor-pointer"
+                />
+              </th>
+              <th className="text-left p-3 font-semibold">Paciente</th>
+              <th className="text-left p-3 font-semibold">Cédula</th>
+              <th className="text-left p-3 font-semibold">Estudiante</th>
+              <th className="text-center p-3 font-semibold">Estado</th>
+              <th className="text-left p-3 font-semibold">Fecha</th>
+              <th className="text-center p-3 font-semibold">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {planesFiltrados.map((p) => (
+              <tr key={p.id} className={`border-b hover:bg-gray-50 ${seleccionados.includes(p.id) ? 'bg-red-50' : ''}`}>
+                <td className="p-3">
                   <input
                     type="checkbox"
                     checked={seleccionados.includes(p.id)}
-                    onChange={(e) => { e.stopPropagation(); toggleSeleccion(p.id); }}
+                    onChange={() => toggleSeleccion(p.id)}
                     className="w-4 h-4 cursor-pointer"
                   />
-                  <div>
-                    <div className="font-medium">
-                      {p.pacientes?.primer_nombre} {p.pacientes?.segundo_nombre || ''} {p.pacientes?.primer_apellido} {p.pacientes?.segundo_apellido || ''}
+                </td>
+                <td className="p-3">
+                  {p.pacientes?.primer_nombre} {p.pacientes?.primer_apellido}
+                </td>
+                <td className="p-3">{p.pacientes?.cedula}</td>
+                <td className="p-3 text-sm">{p.usuarios?.nombre_completo || '-'}</td>
+                <td className="p-3 text-center">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${getEstadoStyle(p.estado)}`}>
+                    {getEstadoLabel(p.estado)}
+                  </span>
+                  {p.motivo_cierre && (
+                    <div className="text-xs text-gray-500 mt-1" title={p.motivo_cierre}>
+                      {p.motivo_cierre.substring(0, 30)}{p.motivo_cierre.length > 30 ? '...' : ''}
                     </div>
-                    <div className="text-sm text-gray-500">CC: {p.pacientes?.cedula}</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <span className={`px-2 py-1 rounded text-xs font-medium ${
-                      p.estado === 'aprobado' ? 'bg-green-100 text-green-700' :
-                      p.estado === 'pendiente_aprobacion' ? 'bg-yellow-100 text-yellow-700' :
-                      p.estado === 'finalizado' ? 'bg-blue-100 text-blue-700' :
-                      'bg-gray-100 text-gray-700'
-                    }`}>
-                      {p.estado}
-                    </span>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {new Date(p.created_at).toLocaleDateString('es-CO')}
-                    </div>
-                  </div>
-                  <button onClick={(e) => { e.stopPropagation(); eliminarPlan(p.id); }} className="text-red-600 hover:text-red-800">
-                    <Trash2 size={18} />
-                  </button>
-                  {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-                </div>
-              </div>
-
-              {isExpanded && (
-                <div className="border-t px-4 py-3 bg-gray-50">
-                  {p.usuarios?.nombre_completo && (
-                    <p className="text-sm text-gray-600 mb-3">Registrado por: <strong>{p.usuarios.nombre_completo}</strong></p>
                   )}
-                  {renderPlan(planFormateado)}
-                </div>
-              )}
-            </div>
-          );
-        })}
+                </td>
+                <td className="p-3 text-sm text-gray-500">
+                  {new Date(p.created_at).toLocaleDateString('es-CO')}
+                  {p.fecha_cierre && (
+                    <div className="text-xs">
+                      Cerrado: {new Date(p.fecha_cierre).toLocaleDateString('es-CO')}
+                    </div>
+                  )}
+                </td>
+                <td className="p-3 text-center">
+                  <div className="flex justify-center gap-2">
+                    {p.estado === 'aprobado' && (
+                      <button
+                        onClick={() => setAbandonando(p.id)}
+                        className="text-gray-600 hover:text-gray-800"
+                        title="Marcar como abandonado"
+                      >
+                        <XCircle size={18} />
+                      </button>
+                    )}
+                    <button
+                      onClick={() => eliminarPlan(p.id)}
+                      className="text-red-600 hover:text-red-800"
+                      title="Eliminar plan"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {planesFiltrados.length === 0 && (
-        <div className="text-center py-8 text-gray-500">No se encontraron planes de tratamiento</div>
+        <div className="text-center py-8 text-gray-500">
+          No se encontraron planes de tratamiento
+        </div>
       )}
     </div>
   );
@@ -1448,44 +1446,78 @@ const GestionHorarios = () => {
     }
   };
 
+  const formatearHora = (hora24) => {
+    if (!hora24) return '';
+    const [h, m] = hora24.split(':').map(Number);
+    const periodo = h >= 12 ? 'PM' : 'AM';
+    const hora12 = h > 12 ? h - 12 : (h === 0 ? 12 : h);
+    return `${hora12}:${m.toString().padStart(2, '0')} ${periodo}`;
+  };
+
   if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-bold">Horarios de Clínica</h3>
-        <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
-          <RefreshCw size={20} /> Actualizar
-        </button>
-      </div>
+      <h3 className="text-lg font-bold mb-2">Configuración de Horarios del Sistema</h3>
+      <p className="text-sm text-gray-500 mb-6">Horas en las que los estudiantes pueden ingresar al sistema</p>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="space-y-4">
         {horarios.map((h) => (
-          <div key={h.id} className={`p-4 border rounded-lg ${h.activo ? 'bg-white' : 'bg-gray-100 opacity-60'}`}>
+          <div key={h.id} className={`p-4 border rounded-lg ${h.activo ? 'bg-white' : 'bg-gray-100'}`}>
             {editando === h.id ? (
               <div className="space-y-3">
-                <div className="flex gap-2">
-                  <input type="time" value={form.hora_inicio || ''} onChange={(e) => setForm({...form, hora_inicio: e.target.value})} className="border rounded px-2 py-1" />
-                  <span className="self-center">a</span>
-                  <input type="time" value={form.hora_fin || ''} onChange={(e) => setForm({...form, hora_fin: e.target.value})} className="border rounded px-2 py-1" />
+                <div className="flex items-center gap-4">
+                  <span className="font-bold capitalize w-24">{h.dia_semana}</span>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label className="text-sm text-gray-600">Hora inicio sistema</label>
+                    <input
+                      type="time"
+                      value={form.hora_inicio || ''}
+                      onChange={(e) => setForm({ ...form, hora_inicio: e.target.value })}
+                      className="w-full border rounded px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Hora fin sistema</label>
+                    <input
+                      type="time"
+                      value={form.hora_fin || ''}
+                      onChange={(e) => setForm({ ...form, hora_fin: e.target.value })}
+                      className="w-full border rounded px-3 py-2"
+                    />
+                  </div>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={guardar} className="bg-green-600 text-white px-3 py-1 rounded text-sm"><Save size={14} /></button>
-                  <button onClick={() => setEditando(null)} className="bg-gray-500 text-white px-3 py-1 rounded text-sm"><X size={14} /></button>
+                  <button onClick={guardar} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                    <Save size={16} />
+                  </button>
+                  <button onClick={() => setEditando(null)} className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600">
+                    <X size={16} />
+                  </button>
                 </div>
               </div>
             ) : (
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="font-semibold">{h.dia_semana}</div>
-                  <div className="text-sm text-gray-600">{h.hora_inicio} - {h.hora_fin}</div>
+                  <span className="font-bold capitalize">{h.dia_semana}</span>
+                  <span className="text-gray-600 ml-4">
+                    {formatearHora(h.hora_inicio)} - {formatearHora(h.hora_fin)}
+                  </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button onClick={() => { setEditando(h.id); setForm({ hora_inicio: h.hora_inicio, hora_fin: h.hora_fin }); }} className="text-blue-600 hover:text-blue-800">
-                    <Edit2 size={18} />
-                  </button>
-                  <button onClick={() => toggleActivo(h.id, h.activo)} className={`px-3 py-1 rounded-full text-xs font-medium ${h.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  <button
+                    onClick={() => toggleActivo(h.id, h.activo)}
+                    className={`px-3 py-1 rounded text-sm ${h.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
+                  >
                     {h.activo ? 'Activo' : 'Inactivo'}
+                  </button>
+                  <button
+                    onClick={() => { setEditando(h.id); setForm(h); }}
+                    className="text-blue-600 hover:text-blue-800"
+                  >
+                    <Edit2 size={18} />
                   </button>
                 </div>
               </div>
@@ -1503,13 +1535,13 @@ const GestionHorarios = () => {
 const GestionFestivos = () => {
   const [festivos, setFestivos] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [nuevo, setNuevo] = useState({ fecha: '', descripcion: '' });
-  const [mostrarForm, setMostrarForm] = useState(false);
+  const [filtroAnio, setFiltroAnio] = useState(new Date().getFullYear());
+  const [form, setForm] = useState({ fecha: '', nombre: '' });
 
   const cargar = async () => {
     setCargando(true);
     try {
-      const data = await supabaseFetch('dias_festivos?order=fecha.desc');
+      const data = await supabaseFetch(`festivos_colombia?anio=eq.${filtroAnio}&order=fecha`);
       setFestivos(data || []);
     } catch (err) {
       console.error(err);
@@ -1518,30 +1550,33 @@ const GestionFestivos = () => {
     }
   };
 
-  useEffect(() => { cargar(); }, []);
+  useEffect(() => { cargar(); }, [filtroAnio]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const agregar = async () => {
-    if (!nuevo.fecha) return;
+  const guardar = async () => {
+    if (!form.fecha || !form.nombre) {
+      alert('Fecha y nombre son requeridos');
+      return;
+    }
     try {
-      await supabaseFetch('dias_festivos', {
+      const anio = new Date(form.fecha).getFullYear();
+      await supabaseFetch('festivos_colombia', {
         method: 'POST',
-        body: JSON.stringify(nuevo)
+        body: JSON.stringify({ ...form, anio })
       });
-      setNuevo({ fecha: '', descripcion: '' });
-      setMostrarForm(false);
+      setForm({ fecha: '', nombre: '' });
       cargar();
     } catch (err) {
-      alert('Error al agregar');
+      alert('Error al guardar');
     }
   };
 
   const eliminar = async (id) => {
     if (!window.confirm('¿Eliminar este festivo?')) return;
     try {
-      await supabaseFetch(`dias_festivos?id=eq.${id}`, { method: 'DELETE' });
+      await supabaseFetch(`festivos_colombia?id=eq.${id}`, { method: 'DELETE' });
       cargar();
     } catch (err) {
-      console.error(err);
+      alert('Error al eliminar');
     }
   };
 
@@ -1550,77 +1585,83 @@ const GestionFestivos = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-bold">Días Festivos ({festivos.length})</h3>
-        <button onClick={() => setMostrarForm(true)} className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-          <Plus size={20} /> Agregar
-        </button>
+        <h3 className="text-lg font-bold">Festivos Colombia</h3>
+        <select
+          value={filtroAnio}
+          onChange={(e) => setFiltroAnio(Number(e.target.value))}
+          className="border rounded-lg px-4 py-2"
+        >
+          {[2025, 2026, 2027, 2028, 2029, 2030].map(a => (
+            <option key={a} value={a}>{a}</option>
+          ))}
+        </select>
       </div>
 
-      {mostrarForm && (
-        <div className="bg-gray-50 p-4 rounded-lg mb-4 border">
-          <div className="flex gap-3 items-end">
+      <div className="bg-gray-50 p-4 rounded-lg mb-6 border">
+        <h4 className="font-bold mb-3">Agregar festivo</h4>
+        <div className="flex gap-3 flex-wrap">
+          <input
+            type="date"
+            value={form.fecha}
+            onChange={(e) => setForm({ ...form, fecha: e.target.value })}
+            className="border rounded-lg px-3 py-2"
+          />
+          <input
+            type="text"
+            placeholder="Nombre del festivo"
+            value={form.nombre}
+            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+            className="border rounded-lg px-3 py-2 flex-1"
+          />
+          <button onClick={guardar} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+            <Plus size={20} />
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        {festivos.map((f) => (
+          <div key={f.id} className="flex justify-between items-center p-3 bg-white border rounded-lg">
             <div>
-              <label className="block text-sm font-medium mb-1">Fecha</label>
-              <input type="date" value={nuevo.fecha} onChange={(e) => setNuevo({...nuevo, fecha: e.target.value})} className="border rounded-lg px-3 py-2" />
+              <span className="font-medium">{f.nombre}</span>
+              <span className="text-gray-500 ml-3 text-sm">
+                {new Date(f.fecha + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </span>
             </div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium mb-1">Descripción</label>
-              <input type="text" placeholder="Ej: Día de la Independencia" value={nuevo.descripcion} onChange={(e) => setNuevo({...nuevo, descripcion: e.target.value})} className="w-full border rounded-lg px-3 py-2" />
-            </div>
-            <button onClick={agregar} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
-              <Save size={18} />
-            </button>
-            <button onClick={() => { setMostrarForm(false); setNuevo({ fecha: '', descripcion: '' }); }} className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600">
-              <X size={18} />
+            <button onClick={() => eliminar(f.id)} className="text-red-600 hover:text-red-800">
+              <Trash2 size={18} />
             </button>
           </div>
-        </div>
-      )}
-
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="text-left p-3 font-semibold">Fecha</th>
-              <th className="text-left p-3 font-semibold">Descripción</th>
-              <th className="text-center p-3 font-semibold">Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {festivos.map((f) => (
-              <tr key={f.id} className="border-b hover:bg-gray-50">
-                <td className="p-3">{new Date(f.fecha + 'T12:00:00').toLocaleDateString('es-CO', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</td>
-                <td className="p-3">{f.descripcion || '-'}</td>
-                <td className="p-3 text-center">
-                  <button onClick={() => eliminar(f.id)} className="text-red-600 hover:text-red-800">
-                    <Trash2 size={18} />
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        ))}
       </div>
 
       {festivos.length === 0 && (
-        <div className="text-center py-8 text-gray-500">No hay días festivos registrados</div>
+        <div className="text-center py-8 text-gray-500">
+          No hay festivos registrados para {filtroAnio}
+        </div>
       )}
     </div>
   );
 };
 
 // =============================================
-// COMPONENTE: LOGS DEL SISTEMA
+// COMPONENTE: GESTIÓN DE LOGS
 // =============================================
 const GestionLogs = () => {
   const [logs, setLogs] = useState([]);
+  const [accesos, setAccesos] = useState([]);
   const [cargando, setCargando] = useState(true);
+  const [tab, setTab] = useState('errores');
 
   const cargar = async () => {
     setCargando(true);
     try {
-      const data = await supabaseFetch('logs_sistema?order=created_at.desc&limit=100');
-      setLogs(data || []);
+      const [logsData, accesosData] = await Promise.all([
+        supabaseFetch('logs_errores?order=created_at.desc&limit=50'),
+        supabaseFetch('sesiones?order=created_at.desc&limit=50&select=*,usuarios(nombre_completo,correo)')
+      ]);
+      setLogs(logsData || []);
+      setAccesos(accesosData || []);
     } catch (err) {
       console.error(err);
     } finally {
@@ -1630,42 +1671,92 @@ const GestionLogs = () => {
 
   useEffect(() => { cargar(); }, []);
 
+  const formatFecha = (fecha) => {
+    return new Date(fecha).toLocaleString('es-CO', {
+      day: '2-digit', month: '2-digit', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  };
+
+  const tiempoTranscurrido = (fecha) => {
+    const mins = Math.floor((new Date() - new Date(fecha)) / 60000);
+    if (mins < 60) return `${mins} min`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs} h`;
+    return `${Math.floor(hrs / 24)} días`;
+  };
+
   if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-lg font-bold">Logs del Sistema</h3>
-        <button onClick={cargar} className="flex items-center gap-2 text-gray-600 hover:text-gray-800">
+      <div className="flex gap-4 mb-6">
+        <button
+          onClick={() => setTab('errores')}
+          className={`px-4 py-2 rounded-lg ${tab === 'errores' ? 'bg-red-100 text-red-700' : 'bg-gray-100'}`}
+        >
+          Errores ({logs.length})
+        </button>
+        <button
+          onClick={() => setTab('accesos')}
+          className={`px-4 py-2 rounded-lg ${tab === 'accesos' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100'}`}
+        >
+          Accesos ({accesos.length})
+        </button>
+        <button onClick={cargar} className="ml-auto flex items-center gap-2 text-gray-600 hover:text-gray-800">
           <RefreshCw size={20} /> Actualizar
         </button>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="text-left p-3 font-semibold">Fecha</th>
-              <th className="text-left p-3 font-semibold">Acción</th>
-              <th className="text-left p-3 font-semibold">Usuario</th>
-              <th className="text-left p-3 font-semibold">Detalles</th>
-            </tr>
-          </thead>
-          <tbody>
-            {logs.map((l) => (
-              <tr key={l.id} className="border-b hover:bg-gray-50">
-                <td className="p-3 whitespace-nowrap">{new Date(l.created_at).toLocaleString('es-CO')}</td>
-                <td className="p-3">{l.accion}</td>
-                <td className="p-3">{l.usuario_id || '-'}</td>
-                <td className="p-3 max-w-xs truncate">{l.detalles || '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {tab === 'errores' && (
+        <div className="space-y-2">
+          {logs.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <CheckCircle size={48} className="mx-auto mb-2 text-green-500" />
+              No hay errores registrados
+            </div>
+          ) : (
+            logs.map((log) => (
+              <div key={log.id} className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="font-mono text-sm bg-red-200 px-2 py-1 rounded">{log.workflow}</span>
+                    <span className="text-sm text-gray-500 ml-2">{log.nodo}</span>
+                  </div>
+                  <span className="text-xs text-gray-500">{formatFecha(log.created_at)}</span>
+                </div>
+                <p className="text-red-700 mt-2 text-sm">{log.error_mensaje}</p>
+              </div>
+            ))
+          )}
+        </div>
+      )}
 
-      {logs.length === 0 && (
-        <div className="text-center py-8 text-gray-500">No hay logs registrados</div>
+      {tab === 'accesos' && (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="text-left p-3">Usuario</th>
+                <th className="text-left p-3">Correo</th>
+                <th className="text-left p-3">Fecha</th>
+                <th className="text-center p-3">Hace</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accesos.map((a) => (
+                <tr key={a.id} className="border-b">
+                  <td className="p-3">{a.usuarios?.nombre_completo || '-'}</td>
+                  <td className="p-3 text-sm text-gray-600">{a.usuarios?.correo || '-'}</td>
+                  <td className="p-3 text-sm">{formatFecha(a.created_at)}</td>
+                  <td className="p-3 text-center text-sm text-gray-500">
+                    {tiempoTranscurrido(a.created_at)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
@@ -1674,7 +1765,7 @@ const GestionLogs = () => {
 // =============================================
 // COMPONENTE: ESTADÍSTICAS
 // =============================================
-const Estadisticas = ({ onNavigate }) => {
+const Estadisticas = () => {
   const [stats, setStats] = useState({
     totalEstudiantes: 0,
     estudiantesActivos: 0,
@@ -1690,6 +1781,7 @@ const Estadisticas = ({ onNavigate }) => {
   const cargar = async () => {
     setCargando(true);
     try {
+      // Consultas separadas para mejor manejo de errores
       let estudiantes = [];
       let pacientes = [];
       let reporteItems = [];
@@ -1704,7 +1796,7 @@ const Estadisticas = ({ onNavigate }) => {
       } catch (e) { console.error('Error pacientes:', e); }
 
       try {
-        reporteItems = await supabaseFetch('reporte_items?select=id,estado_aprobacion') || [];
+        reporteItems = await supabaseFetch('reporte_items?select=id,estado') || [];
       } catch (e) { console.error('Error reportes:', e); }
 
       try {
@@ -1716,9 +1808,9 @@ const Estadisticas = ({ onNavigate }) => {
         estudiantesActivos: estudiantes.filter(e => e.activo).length || 0,
         totalPacientes: pacientes.length || 0,
         totalReportes: reporteItems.length || 0,
-        reportesPendientes: reporteItems.filter(r => r.estado_aprobacion === 'pendiente').length || 0,
-        reportesAprobados: reporteItems.filter(r => r.estado_aprobacion === 'aprobado').length || 0,
-        reportesRechazados: reporteItems.filter(r => r.estado_aprobacion === 'rechazado').length || 0,
+        reportesPendientes: reporteItems.filter(r => r.estado === 'pendiente').length || 0,
+        reportesAprobados: reporteItems.filter(r => r.estado === 'aprobado').length || 0,
+        reportesRechazados: reporteItems.filter(r => r.estado === 'rechazado').length || 0,
         citasProgramadas: citas.length || 0
       });
     } catch (err) {
@@ -1733,12 +1825,12 @@ const Estadisticas = ({ onNavigate }) => {
   if (cargando) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" size={32} /></div>;
 
   const cards = [
-    { label: 'Estudiantes Activos', value: `${stats.estudiantesActivos}/${stats.totalEstudiantes}`, color: 'blue', icon: Users, tab: 'estudiantes' },
-    { label: 'Pacientes Registrados', value: stats.totalPacientes, color: 'green', icon: Users, tab: 'pacientes' },
-    { label: 'Citas Programadas', value: stats.citasProgramadas, color: 'purple', icon: Calendar, tab: 'citas' },
-    { label: 'Reportes Pendientes', value: stats.reportesPendientes, color: 'yellow', icon: Clock, tab: 'planes' },
-    { label: 'Reportes Aprobados', value: stats.reportesAprobados, color: 'green', icon: CheckCircle, tab: 'planes' },
-    { label: 'Reportes Rechazados', value: stats.reportesRechazados, color: 'red', icon: XCircle, tab: 'planes' },
+    { label: 'Estudiantes Activos', value: `${stats.estudiantesActivos}/${stats.totalEstudiantes}`, color: 'blue', icon: Users },
+    { label: 'Pacientes Registrados', value: stats.totalPacientes, color: 'green', icon: Users },
+    { label: 'Citas Programadas', value: stats.citasProgramadas, color: 'purple', icon: Calendar },
+    { label: 'Reportes Pendientes', value: stats.reportesPendientes, color: 'yellow', icon: Clock },
+    { label: 'Reportes Aprobados', value: stats.reportesAprobados, color: 'green', icon: CheckCircle },
+    { label: 'Reportes Rechazados', value: stats.reportesRechazados, color: 'red', icon: XCircle },
   ];
 
   const colorClasses = {
@@ -1760,11 +1852,7 @@ const Estadisticas = ({ onNavigate }) => {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {cards.map((card, idx) => (
-          <div 
-            key={idx} 
-            onClick={() => onNavigate(card.tab)}
-            className={`p-6 rounded-lg border-2 ${colorClasses[card.color]} cursor-pointer hover:shadow-lg transition-shadow`}
-          >
+          <div key={idx} className={`p-6 rounded-lg border-2 ${colorClasses[card.color]}`}>
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium opacity-80">{card.label}</p>
@@ -1918,7 +2006,7 @@ const AdminPanel = () => {
           {tabActivo === 'festivos' && <GestionFestivos />}
           {tabActivo === 'logs' && <GestionLogs />}
           {tabActivo === 'config' && <GestionConfig />}
-          {tabActivo === 'estadisticas' && <Estadisticas onNavigate={setTabActivo} />}
+          {tabActivo === 'estadisticas' && <Estadisticas />}
         </div>
       </div>
     </div>
