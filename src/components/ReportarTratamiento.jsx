@@ -17,6 +17,7 @@ const ReportarTratamiento = () => {
   const [reportesExistentes, setReportesExistentes] = useState([]);
   const [selecciones, setSelecciones] = useState({});
   const [observacion, setObservacion] = useState('');
+  const [planActivoId, setPlanActivoId] = useState(null);
 
   const usuario = JSON.parse(sessionStorage.getItem('usuario') || '{}');
 
@@ -69,6 +70,7 @@ const ReportarTratamiento = () => {
         setCargando(false);
         return;
       }
+      setPlanActivoId(planActivo.id);
 
       // Parsear el plan
       const planData = typeof planActivo.plan_completo === 'string' 
@@ -81,7 +83,7 @@ const ReportarTratamiento = () => {
 
       // Cargar reportes existentes aprobados para este paciente
       const resReportes = await fetch(
-        `${SUPABASE_CONFIG.URL}/rest/v1/reporte_items?select=*,reportes_tratamiento!inner(paciente_id)&reportes_tratamiento.paciente_id=eq.${paciente.id}&estado_aprobacion=eq.aprobado`,
+        `${SUPABASE_CONFIG.URL}/rest/v1/reporte_items?select=*,reportes_tratamiento!inner(paciente_id,plan_id)&reportes_tratamiento.plan_id=eq.${planActivo.id}&estado_aprobacion=eq.aprobado`,
         {
           headers: {
             'apikey': SUPABASE_CONFIG.ANON_KEY,
@@ -392,6 +394,7 @@ const ReportarTratamiento = () => {
           body: JSON.stringify({
             paciente_id: pacienteSeleccionado.id,
             estudiante_id: usuario.id,
+            plan_id: planActivoId,
             fecha_reporte: new Date().toISOString(),
             reporte_texto: observacion || 'Reporte de tratamientos',
             estado: 'pendiente_aprobacion'
@@ -450,6 +453,7 @@ const ReportarTratamiento = () => {
     setSelecciones({});
     setObservacion('');
     setError('');
+    setPlanActivoId(null);
   };
 
   // Agrupar tratamientos por fase
