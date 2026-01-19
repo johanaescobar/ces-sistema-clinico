@@ -390,14 +390,7 @@ const ReportarTratamiento = () => {
     );
   };
 
-  const estaPresentadaConCorrecciones = (tratamiento) => {
-    return reportesExistentes.some(r => 
-      r.tipo_tratamiento === tratamiento.tipo && 
-      r.especificacion === tratamiento.especificacion &&
-      r.estado_aprobacion === 'aprobado' &&
-      r.estado_reportado === 'presentada_correcciones'
-    );
-  };
+  
 
   const esPlanEspecial = tipoPlanActivo === 'historia_clinica' || tipoPlanActivo === 'reevaluacion_inicial';
 
