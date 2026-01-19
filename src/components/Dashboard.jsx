@@ -96,7 +96,7 @@ const Dashboard = () => {
     try {
       // Obtener el plan del paciente
       const planResponse = await fetch(
-        `${SUPABASE_CONFIG.URL}/rest/v1/planes_tratamiento?paciente_id=eq.${pacienteId}&estado=eq.aprobado&select=id,plan_completo`,
+        `${SUPABASE_CONFIG.URL}/rest/v1/planes_tratamiento?paciente_id=eq.${pacienteId}&estado=eq.aprobado&select=id,plan_completo,tipo_plan`,
         {
           headers: {
             'apikey': SUPABASE_CONFIG.ANON_KEY,
@@ -111,7 +111,8 @@ const Dashboard = () => {
       if (!planes || planes.length === 0) return;
 
       const plan = planes[0];
-      const totalTratamientos = contarTratamientosPlan(plan.plan_completo);
+      const esPlanEspecial = plan.tipo_plan === 'historia_clinica' || plan.tipo_plan === 'reevaluacion_inicial';
+      const totalTratamientos = esPlanEspecial ? 1 : contarTratamientosPlan(plan.plan_completo);
 
       // Contar TT aprobados para este paciente
       const reportesResponse = await fetch(
