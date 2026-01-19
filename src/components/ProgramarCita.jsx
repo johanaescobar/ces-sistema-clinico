@@ -672,9 +672,7 @@ const formatearTelefono = (tel) => {
       // Si nunca tuvo plan → historia_clinica
       // Si tuvo plan finalizado → reevaluacion_inicial
       const tipoPlan = tieneAlgunPlanFinalizado ? 'reevaluacion_inicial' : 'historia_clinica';
-      // Determinar tipo de plan a crear
-      const tipoPlan = tieneAlgunPlan ? 'reevaluacion_inicial' : 'historia_clinica';
-      const nombrePlan = tieneAlgunPlan ? 'Reevaluación Inicial' : 'Historia Clínica';
+      const nombrePlan = tieneAlgunPlanFinalizado ? 'Reevaluación Inicial' : 'Historia Clínica';
       
       // Verificar si ya existe un plan de este tipo pendiente/aprobado
       const planEspecialExistente = planes.find(p => 
