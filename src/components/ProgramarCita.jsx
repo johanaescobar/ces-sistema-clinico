@@ -663,10 +663,15 @@ const formatearTelefono = (tel) => {
 
     // 3. Crear plan automático si corresponde
     const planes = pacienteSeleccionado.planes_tratamiento || [];
-    const planActivo = planes.find(p => p.estado === 'aprobado' && p.tipo_plan === 'tratamiento');
-    const tieneAlgunPlan = planes.length > 0;
+    // Buscar cualquier plan activo (de cualquier tipo)
+    const planActivo = planes.find(p => p.estado === 'aprobado' && !p.fecha_cierre);
+    const tieneAlgunPlanFinalizado = planes.some(p => p.estado === 'finalizado');
 
     if (!planActivo) {
+      // Solo crear plan si no hay ninguno activo
+      // Si nunca tuvo plan → historia_clinica
+      // Si tuvo plan finalizado → reevaluacion_inicial
+      const tipoPlan = tieneAlgunPlanFinalizado ? 'reevaluacion_inicial' : 'historia_clinica';
       // Determinar tipo de plan a crear
       const tipoPlan = tieneAlgunPlan ? 'reevaluacion_inicial' : 'historia_clinica';
       const nombrePlan = tieneAlgunPlan ? 'Reevaluación Inicial' : 'Historia Clínica';
