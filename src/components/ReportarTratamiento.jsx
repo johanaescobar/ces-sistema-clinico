@@ -19,8 +19,6 @@ const ReportarTratamiento = () => {
   const [observacion, setObservacion] = useState('');
   const [planActivoId, setPlanActivoId] = useState(null);
   const [tipoPlanActivo, setTipoPlanActivo] = useState('tratamiento');
-  const [planActivoId, setPlanActivoId] = useState(null);
-
   const usuario = JSON.parse(sessionStorage.getItem('usuario') || '{}');
 
   // Cargar pacientes del estudiante
