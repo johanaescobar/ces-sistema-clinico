@@ -667,7 +667,7 @@ const MisPacientes = () => {
                                   <div className="flex items-center gap-2">
                                     {mostrarBotonCargarPlan && (
                                       <button
-                                        onClick={(e) => { e.stopPropagation(); abrirModalNuevoPlan(paciente); }}
+                                        onClick={(e) => { e.stopPropagation(); setModalNuevoPlan(paciente); }}
                                         className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition flex items-center gap-1"
                                         title="Cargar Plan de Tratamiento"
                                       >
