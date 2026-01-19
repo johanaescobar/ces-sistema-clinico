@@ -661,6 +661,50 @@ const formatearTelefono = (tel) => {
       alert('⚠️ Cita guardada, pero no se pudo sincronizar con Google Sheets.\n\nLa Dra. Escobar podrá reintentarlo desde su panel.');
     }
 
+    // 3. Crear plan automático si corresponde
+    const planes = pacienteSeleccionado.planes_tratamiento || [];
+    const planActivo = planes.find(p => p.estado === 'aprobado' && p.tipo_plan === 'tratamiento');
+    const tieneAlgunPlan = planes.length > 0;
+
+    if (!planActivo) {
+      // Determinar tipo de plan a crear
+      const tipoPlan = tieneAlgunPlan ? 'reevaluacion_inicial' : 'historia_clinica';
+      const nombrePlan = tieneAlgunPlan ? 'Reevaluación Inicial' : 'Historia Clínica';
+      
+      // Verificar si ya existe un plan de este tipo pendiente/aprobado
+      const planEspecialExistente = planes.find(p => 
+        p.tipo_plan === tipoPlan && 
+        (p.estado === 'aprobado' || p.estado === 'pendiente_aprobacion')
+      );
+
+      if (!planEspecialExistente) {
+        // Crear plan especial automático (ya aprobado)
+        const planResponse = await fetch(
+          `${SUPABASE_CONFIG.URL}/rest/v1/planes_tratamiento`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': SUPABASE_CONFIG.ANON_KEY,
+              'Authorization': `Bearer ${SUPABASE_CONFIG.ANON_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+              paciente_id: pacienteSeleccionado.id,
+              creado_por: usuario.id,
+              tipo_plan: tipoPlan,
+              plan_completo: { tipo: nombrePlan, descripcion: `${nombrePlan} del paciente` },
+              estado: 'aprobado'
+            })
+          }
+        );
+
+        if (planResponse.ok) {
+          console.log(`Plan ${nombrePlan} creado automáticamente`);
+        }
+      }
+    }
+
     setPaso(7);
   } catch (err) {
     setError('Error al crear la cita: ' + err.message);

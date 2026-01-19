@@ -18,6 +18,8 @@ const ReportarTratamiento = () => {
   const [selecciones, setSelecciones] = useState({});
   const [observacion, setObservacion] = useState('');
   const [planActivoId, setPlanActivoId] = useState(null);
+  const [tipoPlanActivo, setTipoPlanActivo] = useState('tratamiento');
+  const [planActivoId, setPlanActivoId] = useState(null);
 
   const usuario = JSON.parse(sessionStorage.getItem('usuario') || '{}');
 
@@ -42,10 +44,10 @@ const ReportarTratamiento = () => {
       if (!response.ok) throw new Error('Error al cargar pacientes');
       
       const data = await response.json();
-      // Filtrar solo pacientes con plan aprobado
+      // Filtrar pacientes con plan aprobado (cualquier tipo)
       const pacientesConPlan = data.filter(p => {
         const planes = p.planes_tratamiento || [];
-        return planes.some(plan => plan.estado === 'aprobado' && !plan.fecha_finalizacion);
+        return planes.some(plan => plan.estado === 'aprobado' && !plan.fecha_cierre);
       });
       setPacientes(pacientesConPlan);
     } catch (err) {
@@ -61,27 +63,60 @@ const ReportarTratamiento = () => {
     setError('');
 
     try {
-      // Obtener plan activo
+      // Obtener plan activo (priorizar planes especiales primero, luego tratamiento)
       const planes = paciente.planes_tratamiento || [];
-      const planActivo = planes.find(p => p.estado === 'aprobado' && !p.fecha_finalizacion);
+      
+      // Buscar plan especial activo primero
+      let planActivo = planes.find(p => 
+        p.estado === 'aprobado' && 
+        !p.fecha_cierre && 
+        (p.tipo_plan === 'historia_clinica' || p.tipo_plan === 'reevaluacion_inicial')
+      );
+      
+      // Si no hay especial, buscar plan de tratamiento
+      if (!planActivo) {
+        planActivo = planes.find(p => 
+          p.estado === 'aprobado' && 
+          !p.fecha_cierre && 
+          p.tipo_plan === 'tratamiento'
+        );
+      }
       
       if (!planActivo) {
-        setError('Este paciente no tiene un plan de tratamiento activo');
+        setError('Este paciente no tiene un plan activo');
         setCargando(false);
         return;
       }
+
       setPlanActivoId(planActivo.id);
+      setTipoPlanActivo(planActivo.tipo_plan || 'tratamiento');
 
-      // Parsear el plan
-      const planData = typeof planActivo.plan_completo === 'string' 
-        ? JSON.parse(planActivo.plan_completo) 
-        : planActivo.plan_completo;
+      let tratamientos = [];
 
-      // Extraer tratamientos del plan
-      const tratamientos = extraerTratamientos(planData);
+      // Si es plan especial, crear tratamiento virtual
+      if (planActivo.tipo_plan === 'historia_clinica' || planActivo.tipo_plan === 'reevaluacion_inicial') {
+        const nombreTratamiento = planActivo.tipo_plan === 'historia_clinica' 
+          ? 'Historia Clínica' 
+          : 'Reevaluación Inicial';
+        
+        tratamientos = [{
+          id: 0,
+          tipo: nombreTratamiento,
+          especificacion: '',
+          fase: 'Fase Inicial'
+        }];
+      } else {
+        // Plan normal - extraer tratamientos del JSON
+        const planData = typeof planActivo.plan_completo === 'string' 
+          ? JSON.parse(planActivo.plan_completo) 
+          : planActivo.plan_completo;
+        
+        tratamientos = extraerTratamientos(planData);
+      }
+
       setPlanTratamiento(tratamientos);
 
-      // Cargar reportes existentes aprobados para este paciente
+      // Cargar reportes existentes aprobados para este plan
       const resReportes = await fetch(
         `${SUPABASE_CONFIG.URL}/rest/v1/reporte_items?select=*,reportes_tratamiento!inner(paciente_id,plan_id)&reportes_tratamiento.plan_id=eq.${planActivo.id}&estado_aprobacion=eq.aprobado`,
         {
@@ -357,6 +392,17 @@ const ReportarTratamiento = () => {
     );
   };
 
+  const estaPresentadaConCorrecciones = (tratamiento) => {
+    return reportesExistentes.some(r => 
+      r.tipo_tratamiento === tratamiento.tipo && 
+      r.especificacion === tratamiento.especificacion &&
+      r.estado_aprobacion === 'aprobado' &&
+      r.estado_reportado === 'presentada_correcciones'
+    );
+  };
+
+  const esPlanEspecial = tipoPlanActivo === 'historia_clinica' || tipoPlanActivo === 'reevaluacion_inicial';
+
   const handleSeleccion = (tratamientoId, estado) => {
     setSelecciones(prev => {
       const nuevo = { ...prev };
@@ -415,7 +461,7 @@ const ReportarTratamiento = () => {
           tipo_tratamiento: tratamiento.tipo,
           especificacion: tratamiento.especificacion || '',
           descripcion: `${tratamiento.tipo} ${tratamiento.especificacion}`.trim(),
-          estado_reportado: estado === 'TT' ? 'completo' : 'en_proceso',
+          estado_reportado: estado === 'TT' ? 'completo' : estado === 'PC' ? 'presentada_correcciones' : 'en_proceso',
           estado_aprobacion: 'pendiente',
           actualizado_excel: false
         };
@@ -454,6 +500,7 @@ const ReportarTratamiento = () => {
     setObservacion('');
     setError('');
     setPlanActivoId(null);
+    setTipoPlanActivo('tratamiento');
   };
 
   // Agrupar tratamientos por fase
@@ -651,6 +698,18 @@ const ReportarTratamiento = () => {
                                     >
                                       TT
                                     </button>
+                                    {esPlanEspecial && (
+                                      <button
+                                        onClick={() => handleSeleccion(t.id, 'PC')}
+                                        className={`px-3 py-1 rounded text-sm font-medium transition ${
+                                          seleccion === 'PC'
+                                            ? 'bg-orange-600 text-white'
+                                            : 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                                        }`}
+                                      >
+                                        PC
+                                      </button>
+                                    )}
                                     <button
                                       onClick={() => handleSeleccion(t.id, 'EP')}
                                       className={`px-3 py-1 rounded text-sm font-medium transition ${
