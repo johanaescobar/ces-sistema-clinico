@@ -1,6 +1,6 @@
 // src/components/MisPacientes.jsx
 import React, { useState, useEffect } from 'react';
-import { Users, Edit, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle, X, Calendar, Clock, Check } from 'lucide-react';
+import { Users, Edit, ChevronDown, ChevronUp, Loader2, AlertCircle, CheckCircle, X, Calendar, FileText, Clock, Check } from 'lucide-react';
 import { SUPABASE_CONFIG } from '../config/api';
 
 const MisPacientes = () => {
@@ -619,7 +619,14 @@ const MisPacientes = () => {
                           {planes.map((plan) => {
                             const esPlanExpandido = planExpandido === plan.id;
                             const planFormateado = formatearPlan(plan.plan_completo);
-                            const esActivo = plan.estado === 'aprobado';
+                            const esActivo = plan.estado === 'aprobado';                            
+                            const esPlanEspecial = plan.tipo_plan === 'historia_clinica' || plan.tipo_plan === 'reevaluacion_inicial';
+                            const nombrePlan = esPlanEspecial 
+                              ? (plan.tipo_plan === 'historia_clinica' ? 'Historia Clínica' : 'Reevaluación Inicial')
+                              : 'Plan de Tratamiento';
+                            const planEspecialFinalizado = esPlanEspecial && plan.estado === 'finalizado';
+                            const tienePlanTratamientoActivo = planes.some(p => p.tipo_plan === 'tratamiento' && p.estado === 'aprobado' && !p.fecha_cierre);
+                            const mostrarBotonCargarPlan = planEspecialFinalizado && !tienePlanTratamientoActivo;
 
                             return (
                               <div key={plan.id} className="border rounded-lg overflow-hidden">
@@ -628,23 +635,21 @@ const MisPacientes = () => {
                                   className={`p-3 cursor-pointer flex items-center justify-between ${esPlanExpandido ? 'bg-blue-50' : 'bg-white hover:bg-gray-50'}`}
                                 >
                                   <div>
-                                    <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2">
+                                      <span className="font-medium text-gray-800">{nombrePlan}</span>
                                       <span className={`text-xs px-2 py-0.5 rounded ${
                                         plan.estado === 'aprobado' ? 'bg-green-100 text-green-700' :
-                                        plan.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-700' :
+                                        plan.estado === 'pendiente_aprobacion' ? 'bg-yellow-100 text-yellow-700' :
+                                        plan.estado === 'finalizado' ? 'bg-blue-100 text-blue-700' :
+                                        plan.estado === 'abandonado' ? 'bg-gray-100 text-gray-700' :
                                         'bg-red-100 text-red-700'
                                       }`}>
-                                        {plan.estado}
+                                        {plan.estado === 'aprobado' ? 'Activo' : 
+                                         plan.estado === 'finalizado' ? '✓ Finalizado' :
+                                         plan.estado === 'abandonado' ? '✗ Abandonado' :
+                                         plan.estado}
                                       </span>
-                                      {esActivo && (
-                                        <span className="text-xs bg-green-600 text-white px-2 py-0.5 rounded">Activo</span>
-                                      )}
-                                      {plan.estado === 'finalizado' && (
-                                        <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded">✓ Finalizado</span>
-                                      )}
-                                      {plan.estado === 'abandonado' && (
-                                        <span className="text-xs bg-gray-500 text-white px-2 py-0.5 rounded">✗ Abandonado</span>
-                                      )}
+                                      
                                     </div>
                                     <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
                                       <span className="flex items-center gap-1">
@@ -660,7 +665,17 @@ const MisPacientes = () => {
                                     </div>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    {esActivo && (
+                                    {mostrarBotonCargarPlan && (
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); abrirModalNuevoPlan(paciente); }}
+                                        className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition flex items-center gap-1"
+                                        title="Cargar Plan de Tratamiento"
+                                      >
+                                        <FileText size={14} />
+                                        Cargar Plan
+                                      </button>
+                                    )}
+                                    {esActivo && !esPlanEspecial && (
                                       <button
                                         onClick={(e) => { e.stopPropagation(); abrirModalEditar(paciente, plan); }}
                                         className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition"
